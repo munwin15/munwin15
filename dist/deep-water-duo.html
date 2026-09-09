@@ -1,0 +1,2034 @@
+<title>Deep Water Duo</title>
+<style>
+  :root {
+    --bg:      #060d14;
+    --panel:   #0d1a24;
+    --panel2:  #112532;
+    --edge:    #1d3646;
+    --text:    #d7e6f0;
+    --dim:     #7f9aad;
+    --p1:      #5fc9f0;
+    --p2:      #ffb35c;
+    --good:    #5ddc8a;
+    --warn:    #ffd166;
+    --bad:     #ff5c4d;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app {
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  /* ---------- top bar ---------- */
+  #topbar {
+    display: flex; align-items: center; gap: 20px;
+    background: linear-gradient(180deg, #16303f, #0e1f2b);
+    border: 1px solid var(--edge); border-radius: 8px;
+    padding: 8px 14px;
+  }
+  #topbar .cash { font-size: 22px; font-weight: 700; color: var(--good);
+                  font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #topbar .spot { font-size: 16px; font-weight: 600; }
+  #topbar .spot em { color: var(--dim); font-style: normal; font-weight: 400; font-size: 13px; }
+  #topbar .tally { margin-left: auto; color: var(--dim); font-size: 12px; }
+
+  /* ---------- middle ---------- */
+  #middle {
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 8px;
+    min-height: 0;
+  }
+  #stage { position: relative; min-width: 0; min-height: 0; }
+  #lake {
+    width: 100%; height: 100%; display: block;
+    border: 1px solid var(--edge); border-radius: 8px;
+    background: #02141f;
+  }
+
+  /* ---------- hud ---------- */
+  .hud {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 9px 12px; display: flex; flex-direction: column; gap: 6px;
+    overflow: hidden; min-height: 0;
+  }
+  .hud-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .pname { font-size: 16px; font-weight: 700; }
+  .pname.p0 { color: var(--p1); }
+  .pname.p1 { color: var(--p2); }
+  .rank { font-size: 11px; color: var(--dim); }
+  .status {
+    background: var(--panel2); border-radius: 5px; padding: 6px 8px;
+    font-size: 12px; color: var(--dim); text-align: center;
+  }
+  .status.alert { background: #45150f; color: #ff8f85; font-weight: 700; animation: pulse .45s infinite alternate; }
+  .status.fight { background: #3d3410; color: var(--warn); font-weight: 600; }
+  @keyframes pulse { to { opacity: .55; } }
+  .tell {
+    font-size: 11px; color: var(--warn); text-align: center;
+    font-style: italic; margin-top: -2px;
+  }
+
+  .gear div { font-size: 12px; padding: 3px 0; border-bottom: 1px solid #162b39; }
+  .gl { display: inline-block; width: 38px; color: var(--dim); font-size: 10px; letter-spacing: .06em; }
+  .gs { color: var(--dim); font-size: 11px; float: right;
+        font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .barlabel { font-size: 10px; color: var(--dim); letter-spacing: .06em;
+              text-transform: uppercase; margin-top: 4px; }
+  .bar { position: relative; height: 9px; background: #162b39; border-radius: 5px; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 5px;
+           transition: width .05s linear; }
+  .bar i.ok { background: var(--good); }
+  .bar i.warn { background: var(--warn); }
+  .bar i.danger { background: var(--bad); }
+  .bar i.stam { background: #7aa7c7; }
+  .bar u { position: absolute; top: 0; width: 2px; height: 100%; background: rgba(255,255,255,.6); }
+
+  .barlabel .fray { color: var(--bad); animation: pulse .4s infinite alternate; }
+  .stats { font-size: 11px; color: var(--dim); margin-top: auto; line-height: 1.6; flex: none; }
+  .stats b { color: var(--text); }
+
+  .biting { margin-top: 6px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .biting h4 {
+    margin: 0 0 5px; font-size: 10px; letter-spacing: .08em;
+    color: var(--dim); text-transform: uppercase; font-weight: 600;
+  }
+  .bt { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 1.5px 0; }
+  .bt .sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .bt .bn { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bt .bb { width: 46px; height: 5px; background: #162b39; border-radius: 3px; flex: none; }
+  .bt .bb i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
+  .biting .none { font-size: 11px; color: #5b7183; font-style: italic; }
+
+  /* ---------- shop overlay ---------- */
+  .shop {
+    display: none; position: absolute; top: 10px; width: 340px; max-height: calc(100% - 20px);
+    background: rgba(8,20,28,.97); border: 1px solid #2b5570; border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    padding: 10px; overflow: hidden; z-index: 5;
+  }
+  #shop0 { left: 10px; }
+  #shop1 { right: 10px; }
+  .shop-head { font-size: 13px; padding-bottom: 8px; border-bottom: 1px solid var(--edge); }
+  .tabs { display: block; margin-top: 8px; }
+  .tab { font-size: 10px; letter-spacing: .08em; color: var(--dim);
+         padding: 3px 7px; border-radius: 4px; margin-right: 3px; background: #12242f; }
+  .tab.on { background: var(--p1); color: #04131c; font-weight: 700; }
+  .shop-list { margin: 8px 0; max-height: 300px; overflow: auto; }
+  .row { display: flex; justify-content: space-between; gap: 8px;
+         padding: 5px 7px; border-radius: 4px; font-size: 12px; }
+  .row.sel { background: #1d4055; outline: 1px solid #47829f; }
+  .row.equipped .nm, .row.here .nm { color: var(--good); font-weight: 600; }
+  .row.owned .nm { color: var(--text); }
+  .row.poor .nm, .row.locked .nm { color: #5b7183; }
+  .row.poor .rt, .row.locked .rt { color: var(--bad); }
+  .row.register .rt { color: var(--dim); }
+  .row.register.owned .rt { color: var(--warn); font-weight: 600; }
+  .row .rt { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--dim); }
+  .row.buy .rt, .row.go .rt { color: var(--warn); }
+  .shop-detail { border-top: 1px solid var(--edge); padding-top: 8px; min-height: 62px; }
+  .dnote { font-size: 11px; color: var(--p1); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .dblurb { font-size: 11px; color: var(--dim); font-style: italic; margin-top: 4px; }
+  .dflash { font-size: 11px; color: var(--warn); margin-top: 5px; font-weight: 600; }
+  .shop-keys { font-size: 10px; color: #5b7183; border-top: 1px solid var(--edge);
+               margin-top: 6px; padding-top: 6px; }
+
+  /* ---------- bottom ---------- */
+  #bottom { display: grid; grid-template-columns: 1fr 300px 300px; gap: 8px; height: 124px; min-height: 0; }
+  #log, #recwrap, #chwrap {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 8px 12px; overflow: auto; font-size: 12px;
+  }
+  #log .l { padding: 1px 0; color: var(--dim); }
+  #log .l.good { color: var(--good); }
+  #log .l.bad { color: #e08a80; }
+  #log .l.record { color: var(--warn); font-weight: 700; }
+  #recwrap h3, #chwrap h3 { margin: 0 0 5px; font-size: 11px; letter-spacing: .1em;
+                color: var(--dim); text-transform: uppercase; }
+  #reccount, #chcount { color: var(--warn); }
+  .ch { margin-bottom: 7px; }
+  .ch:last-child { margin-bottom: 0; }
+  .chtop { display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
+  .cht { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chr { color: var(--good); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .chbar { height: 4px; background: #162b39; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .chbar i { display: block; height: 100%; background: var(--warn); border-radius: 3px; }
+  .chp { font-size: 10px; color: var(--dim); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .rec { display: flex; gap: 8px; font-size: 11px; padding: 1px 0; }
+  .rec .rn { flex: 1; }
+  .rec .rw { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--warn); }
+  .rec .rb { color: var(--dim); width: 62px; text-align: right; }
+  .empty { color: #5b7183; font-size: 11px; font-style: italic; }
+
+  /* ---------- splash ---------- */
+  #splash {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    background: rgba(3,10,16,.94); padding: 20px;
+  }
+  #splash .card {
+    max-width: 780px; background: var(--panel); border: 1px solid #2b5570;
+    border-radius: 12px; padding: 26px 32px;
+  }
+  #splash h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  #splash h1 span { color: var(--p1); }
+  #splash .tag { color: var(--dim); margin-bottom: 18px; }
+  .ctrls { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 16px; }
+  .ctrls section { background: var(--panel2); border-radius: 8px; padding: 12px 14px; }
+  .ctrls h2 { margin: 0 0 8px; font-size: 14px; }
+  .ctrls .k { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+  .ctrls kbd {
+    background: #1e3d50; border: 1px solid #35617c; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 6px; font-size: 11px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .tips { font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .tips b { color: var(--text); }
+  .go { margin-top: 16px; text-align: center; color: var(--warn); font-weight: 600; }
+</style>
+<div id="app">
+  <div id="topbar"></div>
+
+  <div id="middle">
+    <div class="hud" id="hud0"></div>
+    <div id="stage">
+      <canvas id="lake"></canvas>
+      <div class="shop" id="shop0"></div>
+      <div class="shop" id="shop1"></div>
+    </div>
+    <div class="hud" id="hud1"></div>
+  </div>
+
+  <div id="bottom">
+    <div id="log"></div>
+    <div id="chwrap">
+      <h3>Charter board <span id="chcount"></span></h3>
+      <div id="charters"></div>
+    </div>
+    <div id="recwrap">
+      <h3>Lake record book <span id="reccount"></span></h3>
+      <div id="records"></div>
+    </div>
+  </div>
+</div>
+
+<div id="splash">
+  <div class="card">
+    <h1>Deep <span>Water</span> Duo</h1>
+    <div class="tag">Two anglers, one boat, one shared wallet. Fish deeper, catch bigger.</div>
+
+    <div class="ctrls">
+      <section>
+        <h2 style="color:#5fc9f0">Player 1</h2>
+        <div class="k"><span>Cast / hookset / reel</span><kbd>SPACE</kbd></div>
+        <div class="k"><span>Let line out (sink)</span><kbd>S</kbd></div>
+        <div class="k"><span>Reel up</span><kbd>W</kbd></div>
+        <div class="k"><span>Swap lure / shop tab</span><kbd>Q</kbd></div>
+        <div class="k"><span>Shop &amp; travel</span><kbd>E</kbd></div>
+      </section>
+      <section>
+        <h2 style="color:#ffb35c">Player 2</h2>
+        <div class="k"><span>Cast / hookset / reel</span><kbd>ENTER</kbd></div>
+        <div class="k"><span>Let line out (sink)</span><kbd>&#8595;</kbd></div>
+        <div class="k"><span>Reel up</span><kbd>&#8593;</kbd></div>
+        <div class="k"><span>Swap lure / shop tab</span><kbd>/</kbd></div>
+        <div class="k"><span>Shop &amp; travel</span><kbd>RIGHT SHIFT</kbd></div>
+      </section>
+    </div>
+
+    <div class="tips">
+      <b>Cast</b> by holding your action key and releasing at the power you want.
+      <b>Sink</b> to the depth the fish are holding at, then <b>tap</b> your action key to work the
+      lure — that jigging action is what draws a strike.<br>
+      When you see <b>!</b>, tap again fast to set the hook. In the fight, <b>hold</b> to reel:
+      it gains line but loads the rod. Let go and the drag gives it back. Push past the white
+      mark and the line starts <b>fraying</b> — that damage never heals, so muscle a fish for
+      long enough and it will part. Pump and wind instead.<br>
+      <b>Co-op:</b> when your partner is hooked up and your line is in the boat, hold your action key
+      to work the net — it bleeds off their tension and pays you both. Land two fish at once for a
+      <b>double header</b> bonus.<br>
+      <b>Progress:</b> rods carry heavier fish, reels hold more line and unlock deeper spots, lures
+      decide which species even look at you. Money is shared, so plan the upgrades together.
+      Every species fights differently: pike run, catfish sulk, bass jump. Your panel tells you
+      which you have on.
+    </div>
+
+    <div class="go">Press any key to shove off &nbsp;·&nbsp; SHIFT+R wipes the save</div>
+  </div>
+</div>
+
+<script>
+/* ---- src/data.js ---- */
+/* =====================================================================
+   Deep Water Duo - game data
+   Rods, reels, lures, species and fishing spots.
+   All depths are in feet, all weights in pounds.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------
+   RODS
+   power       : pounds of pull the blank can carry before the line
+                 pops. This is the single biggest gate on big fish.
+   sensitivity : 0..1, widens the hookset window when a fish bites.
+   cast        : how far you can throw, in feet. Longer casts reach
+                 the productive water further from the boat.
+   --------------------------------------------------------------- */
+const RODS = [
+  { id: 'cane',     name: 'Cane Pole',            price:     0, power:  8, sensitivity: 0.55, cast:  30,
+    blurb: 'A stick with line tied to the end. It has caught more bluegill than every graphite rod combined.' },
+  { id: 'glass',    name: 'Fiberglass Spinner',   price:   250, power: 14, sensitivity: 0.64, cast:  45,
+    blurb: 'Soft, forgiving, nearly unbreakable. Bends into a horseshoe and keeps going.' },
+  { id: 'graphite', name: 'Graphite Medium',      price:   900, power: 24, sensitivity: 0.78, cast:  60,
+    blurb: 'Light and fast. You will feel a walleye breathe on the jig.' },
+  { id: 'heavy',    name: 'Composite Heavy',      price:  2800, power: 40, sensitivity: 0.85, cast:  75,
+    blurb: 'Built for pike and catfish. Lifts fish that argue.' },
+  { id: 'jigging',  name: 'Deep Jigging Rod',     price:  7500, power: 62, sensitivity: 0.92, cast:  85,
+    blurb: 'Short, brutal, and made to work metal a hundred feet down.' },
+  { id: 'musky',    name: 'Titanium Musky Stick', price: 18000, power: 95, sensitivity: 0.97, cast: 100,
+    blurb: 'The last rod you will ever need, assuming the sturgeon agrees.' },
+];
+
+/* ---------------------------------------------------------------
+   REELS
+   maxDepth : how much line is on the spool. This is the hard cap on
+              how deep you can fish, and the gate on the deep spots.
+   retrieve : feet per second of line you can pick up.
+   drag     : 0..1, how smoothly the drag absorbs a surge. High drag
+              means tension climbs slower and recovers faster.
+   --------------------------------------------------------------- */
+const REELS = [
+  { id: 'spincast', name: 'Plastic Spincast',   price:     0, maxDepth:  20, retrieve: 0.9, drag: 0.50,
+    blurb: 'Push the button, hope for the best. Twenty feet of line and a lot of optimism.' },
+  { id: 'spin2500', name: 'Spinning Reel 2500', price:   300, maxDepth:  45, retrieve: 1.2, drag: 0.65,
+    blurb: 'The reel everyone actually owns. Smooth enough for trout.' },
+  { id: 'baitcast', name: 'Baitcaster Pro',     price:  1100, maxDepth:  75, retrieve: 1.5, drag: 0.75,
+    blurb: 'Thumb it wrong and you get a birds nest. Thumb it right and you get a walleye.' },
+  { id: 'sealed',   name: 'Sealed Drag 4000',   price:  3400, maxDepth: 110, retrieve: 1.8, drag: 0.85,
+    blurb: 'Carbon washers, sealed body. Shrugs off a catfish that has decided to sulk.' },
+  { id: 'winch',    name: 'Deep Winch DX',      price:  9000, maxDepth: 160, retrieve: 2.1, drag: 0.92,
+    blurb: 'Geared like a boat trailer jack. Built to haul lakers off the basin floor.' },
+  { id: 'abyss',    name: 'Abyss Master 9000',  price: 22000, maxDepth: 220, retrieve: 2.5, drag: 0.98,
+    blurb: 'Enough braid to reach the bottom of the Trench, and the drag to survive what lives there.' },
+];
+
+/* ---------------------------------------------------------------
+   LURES
+   min/max  : the depth band where the lure presents properly. Fish
+              it outside that window and your bites dry up.
+   size     : 1..6. A fish will not eat a lure smaller than its
+              minLure, and big lures stop drawing small fish.
+   action   : how much bite pressure a good jigging rhythm generates.
+   tags     : which species families the lure speaks to.
+   --------------------------------------------------------------- */
+const LURES = [
+  { id: 'worm',     name: 'Garden Worm',      price:     0, min:   0, max:  25, size: 1, action: 0.75,
+    tags: ['panfish'], blurb: 'Undefeated on bluegill since the invention of the bluegill.' },
+  { id: 'spinner',  name: 'Inline Spinner',   price:   120, min:   0, max:  30, size: 2, action: 1.00,
+    tags: ['panfish','bass','trout'], blurb: 'Flash and thump. Everything in the shallows takes a swing at it.' },
+  { id: 'jig',      name: 'Soft Plastic Jig', price:   260, min:   5, max:  50, size: 2, action: 1.10,
+    tags: ['bass','walleye','panfish'], blurb: 'The most versatile thing in the box. Hop it, drag it, dead-stick it.' },
+  { id: 'crank',    name: 'Shallow Crankbait',price:   450, min:   0, max:  20, size: 3, action: 0.95,
+    tags: ['bass','pike'], blurb: 'Wobbles like a wounded shad over the weed tops.' },
+  { id: 'spoon',    name: 'Casting Spoon',    price:   700, min:  10, max:  60, size: 3, action: 1.05,
+    tags: ['pike','trout','walleye'], blurb: 'A bent piece of metal that has been fooling pike for a century.' },
+  { id: 'diver',    name: 'Deep Diver Plug',  price:  1600, min:  25, max:  90, size: 4, action: 1.15,
+    tags: ['walleye','laketrout','bass'], blurb: 'Long bill, deep dive. Digs into water most lures never see.' },
+  { id: 'rig',      name: 'Live Bait Rig',    price:  2400, min:  15, max:  80, size: 4, action: 0.85,
+    tags: ['catfish','walleye','sturgeon'], blurb: 'Slow, smelly and devastating on anything with whiskers.' },
+  { id: 'glide',    name: 'Glide Bait',       price:  5000, min:   5, max:  60, size: 5, action: 1.25,
+    tags: ['musky','pike','bass'], blurb: 'A foot of hand-carved wood that swims in lazy S-turns. Musky candy.' },
+  { id: 'jigspoon', name: 'Jigging Spoon XL', price:  8500, min:  60, max: 160, size: 5, action: 1.20,
+    tags: ['laketrout','burbot','sturgeon','catfish'], blurb: 'Heavy enough to punch straight down to the basin.' },
+  { id: 'rattler',  name: 'Abyss Rattler',    price: 16000, min: 100, max: 220, size: 6, action: 1.35,
+    tags: ['sturgeon','musky','catfish','laketrout','gar'], blurb: 'Tungsten rattles you can hear through the rod. It calls up things that should stay down.' },
+];
+
+/* ---------------------------------------------------------------
+   SPECIES
+   min/max  : the depth band the fish holds in.
+   str      : pounds of pull at average size. Compare to rod power.
+   stam     : how long it fights before it gives up.
+   rarity   : relative spawn weight. Higher shows up more often.
+   ppl      : dollars per pound at the dock.
+   minLure  : the smallest lure size this fish will commit to.
+   fight    : how it behaves once hooked. See FIGHT_STYLES in game.js.
+              steady/jumper/runner/bulldog/deep all need different hands
+              on the reel, which is what makes each species feel distinct.
+   --------------------------------------------------------------- */
+const SPECIES = [
+  { id:'bluegill', name:'Bluegill',          tags:['panfish'], min:    0, max:  15, wMin:0.2, wMax:  1.2,
+    str: 2,  stam: 22,  rarity: 100, ppl:  6, minLure:1, fight:'steady', color:'#e0a13a', belly:'#f2d98a' },
+  { id:'rockbass', name:'Rock Bass',         tags:['panfish'], min:    0, max:  20, wMin:0.3, wMax:  1.5,
+    str: 3,  stam: 24,  rarity:  80, ppl:  7, minLure:1, fight:'steady', color:'#8a7a4a', belly:'#d8cc9a' },
+  { id:'perch',    name:'Yellow Perch',      tags:['panfish'], min:    2, max:  30, wMin:0.3, wMax:  2.0,
+    str: 3,  stam: 26,  rarity:  85, ppl:  8, minLure:1, fight:'steady', color:'#d9b12e', belly:'#f6e6a0' },
+  { id:'crappie',  name:'Black Crappie',     tags:['panfish'], min:    3, max:  28, wMin:0.4, wMax:  3.0,
+    str: 4,  stam: 30,  rarity:  70, ppl:  9, minLure:1, fight:'steady', color:'#6f7f6a', belly:'#cfd8c2' },
+  { id:'largemouth',name:'Largemouth Bass',  tags:['bass'],    min:    2, max:  32, wMin:1.0, wMax: 12.0,
+    str: 9,  stam: 58,  rarity:  55, ppl: 14, minLure:2, fight:'jumper', color:'#4f7a3a', belly:'#cbdda6' },
+  { id:'smallmouth',name:'Smallmouth Bass',  tags:['bass'],    min:   20, max:  45, wMin:1.0, wMax:  8.0,
+    str: 11, stam: 64,  rarity:  45, ppl: 16, minLure:2, fight:'jumper', color:'#8a6a3a', belly:'#e0c99a' },
+  { id:'rainbow',  name:'Rainbow Trout',     tags:['trout'],   min:   22, max:  50, wMin:1.0, wMax: 14.0,
+    str: 10, stam: 68,  rarity:  40, ppl: 18, minLure:2, fight:'jumper', color:'#7d8fa8', belly:'#f0d2d8' },
+  { id:'walleye',  name:'Walleye',           tags:['walleye'], min:  38, max:  75, wMin:2.0, wMax: 16.0,
+    str: 10, stam: 58,  rarity:  38, ppl: 22, minLure:2, fight:'steady', color:'#9a8f45', belly:'#efe3ae' },
+  { id:'pike',     name:'Northern Pike',     tags:['pike'],    min:   24, max:  55, wMin:3.0, wMax: 30.0,
+    str: 17, stam: 84,  rarity:  30, ppl: 20, minLure:3, fight:'runner', color:'#4a6a48', belly:'#d7e0b0' },
+  { id:'brown',    name:'Brown Trout',       tags:['trout'],   min:  40, max:  72, wMin:2.0, wMax: 25.0,
+    str: 14, stam: 78,  rarity:  22, ppl: 24, minLure:3, fight:'jumper', color:'#8f6a35', belly:'#efd9a4' },
+  { id:'channel',  name:'Channel Catfish',   tags:['catfish'], min:  62, max:  95, wMin:3.0, wMax: 35.0,
+    str: 19, stam: 98,  rarity:  30, ppl: 15, minLure:3, fight:'bulldog', color:'#6d6357', belly:'#ded3c0' },
+  { id:'laketrout',name:'Lake Trout',        tags:['laketrout','trout'], min:  68, max:165, wMin:5.0, wMax: 45.0,
+    str: 23, stam:112,  rarity:  26, ppl: 28, minLure:4, fight:'deep', color:'#5d6a72', belly:'#cdd7dc' },
+  { id:'burbot',   name:'Burbot',            tags:['burbot'],  min: 115, max:185, wMin:2.0, wMax: 18.0,
+    str: 15, stam: 88,  rarity:  22, ppl: 20, minLure:4, fight:'bulldog', color:'#7a6a4a', belly:'#d6c8a4' },
+  { id:'flathead', name:'Flathead Catfish',  tags:['catfish'], min:  65, max:125, wMin:10.0,wMax: 90.0,
+    str: 35, stam:152,  rarity:  14, ppl: 26, minLure:4, fight:'bulldog', color:'#7a6a3c', belly:'#e2d3a2' },
+  { id:'musky',    name:'Muskellunge',       tags:['musky','pike'], min:   36, max:  62, wMin:10.0,wMax: 60.0,
+    str: 31, stam:142,  rarity:   7, ppl: 40, minLure:5, fight:'runner', color:'#5a6b4a', belly:'#dfe3b8' },
+  { id:'gar',      name:'Alligator Gar',     tags:['gar'],     min: 112, max: 160, wMin:20.0,wMax:140.0,
+    str: 46, stam:205,  rarity:   5, ppl: 45, minLure:5, fight:'runner', color:'#5b5540', belly:'#cdc4a0' },
+  { id:'sturgeon', name:'Lake Sturgeon',     tags:['sturgeon'],min: 175, max:235, wMin:30.0,wMax:220.0,
+    str: 56, stam:265,  rarity:   6, ppl: 60, minLure:5, fight:'bulldog', color:'#4a5560', belly:'#c2ccd4' },
+];
+
+/* ---------------------------------------------------------------
+   SPOTS
+   The boat is shared, so both anglers always fish the same water.
+   needDepth : the reel line capacity required to travel here. The
+               deeper spots are the whole reason to upgrade.
+   --------------------------------------------------------------- */
+const SPOTS = [
+  { id:'cove',   name:'Lily Pad Cove', top:  0, bottom:  18, needDepth:   0,
+    blurb:'Warm, weedy and forgiving. Panfish everywhere and the odd bass under the pads.' },
+  { id:'flats',  name:'Weed Flats',    top:  0, bottom:  35, needDepth:  30,
+    blurb:'Cabbage weed out to the first break. Bass, pike and perch patrol the edge.' },
+  { id:'point',  name:'Rocky Point',   top:  0, bottom:  60, needDepth:  50,
+    blurb:'A boulder shelf falling away into blue water. Smallmouth stack on the rocks.' },
+  { id:'drop',   name:'The Drop-Off',  top:  0, bottom: 110, needDepth:  75,
+    blurb:'The old river channel. Walleye and catfish hold on the lip all day.' },
+  { id:'basin',  name:'Deep Basin',    top:  0, bottom: 170, needDepth: 120,
+    blurb:'Cold, dark and 40 degrees on the bottom. Lake trout country.' },
+  { id:'trench', name:'The Trench',    top:  0, bottom: 240, needDepth: 190,
+    blurb:'A crack in the lake floor nobody has properly mapped. Sturgeon live down here.' },
+];
+
+const RANKS = [
+  'Dock Kid', 'Weekender', 'Angler', 'Sharp Hook', 'Lake Regular',
+  'Guide', 'Tournament Pro', 'Deep Water Hand', 'Lake Legend',
+];
+
+/* Rough length in inches from weight, used for the record book. */
+function lengthFor(species, weight) {
+  const slim = species.tags.includes('pike') || species.tags.includes('musky') ||
+               species.tags.includes('gar') || species.tags.includes('sturgeon') ||
+               species.tags.includes('burbot');
+  const k = slim ? 900 : 1600;
+  return Math.cbrt(weight * k);
+}
+</script>
+<script>
+/* ---- src/game.js ---- */
+/* =====================================================================
+   Deep Water Duo - game state and simulation
+   ===================================================================== */
+
+/* Past this much of the rod's rating the line starts taking damage. */
+const SAFE_TENSION = 0.82;
+
+const PHASE = {
+  IDLE:    'idle',     // on the boat, nothing in the water
+  AIMING:  'aiming',   // holding the action key, power meter swinging
+  SINKING: 'sinking',  // lure is in the water, working the depth
+  BITE:    'bite',     // a fish has it, hookset window is open
+  FIGHT:   'fight',    // hooked up
+  RESULT:  'result',   // showing what you caught or lost
+};
+
+function makeAngler(index, name) {
+  return {
+    index, name,
+    rod: 0, reel: 0, lure: 0,          // indexes into RODS / REELS / LURES
+    owned: { rods: ['cane'], reels: ['spincast'], lures: ['worm'] },
+    phase: PHASE.IDLE,
+    power: 0, powerDir: 1,             // cast meter
+    castDist: 0,                       // feet from the boat
+    depth: 0,                          // how deep the lure is now
+    action: 0,                         // jigging energy, decays constantly
+    lastJig: 0,
+    biteTimer: 0, biteWindow: 0,
+    fish: null,
+    tension: 0, wear: 0,
+    resultTimer: 0, result: null,
+    assisting: false,                  // helping the partner land theirs
+    hadAssist: false, hadPartnerOn: false,  // co-op bonuses latched per fight
+    xp: 0, level: 1,
+    caught: 0, lost: 0, heaviest: 0,
+    streak: 0,
+  };
+}
+
+function newGame() {
+  return {
+    cash: 0,
+    spot: 0,
+    anglers: [makeAngler(0, 'Player 1'), makeAngler(1, 'Player 2')],
+    records: {},        // speciesId -> { weight, length, by, spot }
+    log: [],
+    charters: [],
+    chartersDone: 0,
+    totalCaught: 0,
+    totalEarned: 0,
+    doubleHeaders: 0,
+    assists: 0,
+    time: 0,
+  };
+}
+
+/* --------------------------------------------------------------- */
+/* Gear helpers                                                     */
+/* --------------------------------------------------------------- */
+const rodOf  = a => RODS[a.rod];
+const reelOf = a => REELS[a.reel];
+const lureOf = a => LURES[a.lure];
+
+/* How deep this angler can physically fish right now: limited by the
+   spool of line on the reel and by the lake bottom at this spot. */
+function maxDepthFor(game, a) {
+  return Math.min(reelOf(a).maxDepth, SPOTS[game.spot].bottom);
+}
+
+/* The deepest spot the crew can reach. Travel is shared, so the better
+   equipped angler can drag the whole boat somewhere new. */
+function canTravel(game, spotIndex) {
+  const best = Math.max(...game.anglers.map(a => reelOf(a).maxDepth));
+  return best >= SPOTS[spotIndex].needDepth;
+}
+
+function levelFor(xp) { return Math.max(1, Math.floor(Math.sqrt(xp / 55)) + 1); }
+function rankName(level) { return RANKS[Math.min(RANKS.length - 1, level - 1)]; }
+
+/* --------------------------------------------------------------- */
+/* Bite model                                                       */
+/* --------------------------------------------------------------- */
+/* Score how interested one species is in what this angler is doing.
+   Returns bites per second. Zero means it is not even a candidate. */
+function biteRate(game, a, sp, atDepth) {
+  const spot = SPOTS[game.spot];
+  const lure = lureOf(a);
+  const d = atDepth === undefined ? a.depth : atDepth;
+
+  // The fish has to actually live at this depth, in this lake bottom.
+  if (d < sp.min || d > sp.max) return 0;
+  if (sp.min > spot.bottom) return 0;
+
+  // Lure size gates. Too small and the fish ignores it, far too big and
+  // the little ones cannot get their mouth around it.
+  if (lure.size < sp.minLure) return 0;
+  let sizeFit = 1;
+  const over = lure.size - sp.minLure;
+  if (over >= 3) sizeFit = 0.18;
+  else if (over === 2) sizeFit = 0.55;
+
+  // Does the lure speak this fish's language?
+  const match = lure.tags.some(t => sp.tags.includes(t));
+  const lureFit = match ? 1 : 0.22;
+
+  // Presenting the lure outside its working depth kills the action.
+  const inBand = d >= lure.min && d <= lure.max;
+  const bandFit = inBand ? 1 : 0.3;
+
+  // Fish hold tighter to their preferred depth than to the edges.
+  const mid = (sp.min + sp.max) / 2;
+  const half = Math.max(1, (sp.max - sp.min) / 2);
+  const depthFit = 0.45 + 0.55 * (1 - Math.min(1, Math.abs(d - mid) / half));
+
+  // Working the rod is what triggers the strike.
+  const actionMul = 0.35 + a.action * lure.action * 1.3;
+
+  // Compressed rather than linear: at face value the rarity spread made the
+  // deep spots crawl, since everything down there is rare by design. This
+  // keeps trophies uncommon without leaving two players staring at a rod.
+  const rarity = Math.pow(sp.rarity / 100, 0.6);
+  return 0.055 * rarity * sizeFit * lureFit * bandFit * depthFit * actionMul;
+}
+
+function candidateBites(game, a) {
+  return SPECIES.map(sp => ({ sp, rate: biteRate(game, a, sp) }))
+    .filter(c => c.rate > 0)
+    .sort((x, y) => y.rate - x.rate);
+}
+
+/* Everything this rig could catch somewhere in the water column here,
+   with the depth that gives the best odds. Drives the HUD readout so
+   players can see why a lure or a reel upgrade matters. */
+function surveySpecies(game, a) {
+  const maxD = maxDepthFor(game, a);
+  const step = Math.max(0.5, maxD / 80);
+  const out = [];
+  for (const sp of SPECIES) {
+    let best = 0, bestDepth = 0;
+    for (let d = 0; d <= maxD; d += step) {
+      const r = biteRate(game, a, sp, d);
+      if (r > best) { best = r; bestDepth = d; }
+    }
+    if (best > 0) out.push({ sp, rate: best, depth: bestDepth });
+  }
+  return out.sort((x, y) => y.rate - x.rate);
+}
+
+function rollBite(game, a, dt) {
+  const cands = candidateBites(game, a);
+  const total = cands.reduce((s, c) => s + c.rate, 0);
+  if (total <= 0) return null;
+  if (Math.random() > 1 - Math.exp(-total * dt)) return null;
+  let r = Math.random() * total;
+  for (const c of cands) { r -= c.rate; if (r <= 0) return c.sp; }
+  return cands[cands.length - 1].sp;
+}
+
+/* --------------------------------------------------------------- */
+/* Hooking a fish                                                   */
+/* --------------------------------------------------------------- */
+function makeFish(sp, a) {
+  // Weight is skewed towards the small end, with a long tail so the
+  // occasional giant shows up and tests your gear.
+  const roll = Math.pow(Math.random(), 2.1);
+  const weight = sp.wMin + (sp.wMax - sp.wMin) * roll;
+  const sizeMul = 0.6 + 0.8 * roll;
+  const stam = sp.stam * (0.75 + 0.5 * roll);
+  return {
+    sp, weight, sizeMul,
+    length: lengthFor(sp, weight),
+    stamina: stam, maxStamina: stam,
+    distance: Math.max(22, a.castDist * 0.6 + a.depth * 0.55),
+    startDistance: 0,
+    surge: 0, surgeTimer: 1 + Math.random() * 2,
+    phase: Math.random() * 6.28,
+  };
+}
+
+/* ---------------------------------------------------------------
+   FIGHT STYLES
+   Every species pulls the same average weight for its size, but how it
+   delivers that pull is what makes it feel different in the hand.
+   chance   : odds of starting a surge when the timer comes up
+   mag      : how hard a surge hits on top of the base pull
+   gap      : seconds between surge rolls, [min, max]
+   decay    : how fast a surge bleeds off. Low means long, grinding runs.
+   drain    : endurance multiplier. Low means it never gives up.
+   --------------------------------------------------------------- */
+const FIGHT_STYLES = {
+  steady:  { chance: 0.35, mag: 0.40, gap: [1.0, 2.6], decay: 0.60, drain: 1.00,
+             tell: 'steady, honest pulls' },
+  jumper:  { chance: 0.62, mag: 0.80, gap: [0.4, 1.3], decay: 0.95, drain: 1.30,
+             tell: 'sharp and erratic - it will jump' },
+  runner:  { chance: 0.55, mag: 1.05, gap: [0.7, 2.0], decay: 0.32, drain: 1.15,
+             tell: 'long hard runs - give it line' },
+  bulldog: { chance: 0.24, mag: 0.45, gap: [1.6, 3.4], decay: 0.40, drain: 0.62,
+             tell: 'sulking deep - it will not quit' },
+  deep:    { chance: 0.40, mag: 0.68, gap: [1.2, 3.0], decay: 0.42, drain: 0.82,
+             tell: 'slow and heavy - it keeps diving' },
+};
+
+function styleOf(sp) { return FIGHT_STYLES[sp.fight] || FIGHT_STYLES.steady; }
+
+/* Pounds of pull the fish is putting on the rod right now. */
+function fishPull(f) {
+  const fatigue = 0.3 + 0.7 * (f.stamina / f.maxStamina);
+  const wobble = 1 + 0.18 * Math.sin(f.phase);
+  return f.sp.str * f.sizeMul * fatigue * wobble * (1 + f.surge);
+}
+
+/* --------------------------------------------------------------- */
+/* The fight                                                        */
+/* --------------------------------------------------------------- */
+function stepFight(game, a, dt, input, partner) {
+  const f = a.fish;
+  const rod = rodOf(a), reel = reelOf(a);
+
+  const style = styleOf(f.sp);
+  f.phase += dt * 3.2;
+  f.surgeTimer -= dt;
+  if (f.surgeTimer <= 0) {
+    // A fresh fish makes hard runs. A tired one mostly sulks.
+    const energy = f.stamina / f.maxStamina;
+    f.surge = Math.random() < style.chance * energy + 0.08
+      ? style.mag * (0.45 + Math.random() * 0.55) * energy
+      : 0;
+    f.surgeTimer = style.gap[0] + Math.random() * (style.gap[1] - style.gap[0]);
+  }
+  f.surge = Math.max(0, f.surge - dt * style.decay);
+
+  const reeling = input.action;
+  // A partner with nothing in the water can grab the net and take some
+  // of the load off. This is the co-op payoff.
+  const assisted = !!(partner && partner.phase === PHASE.IDLE && partner.assisting);
+
+  // Latch both co-op states so they still count at the moment of landing,
+  // even if the partner boated their own fish a second earlier.
+  if (assisted) a.hadAssist = true;
+  if (partner && partner.phase === PHASE.FIGHT) a.hadPartnerOn = true;
+
+  const pull = fishPull(f);
+  const load = pull + (reeling ? 1.2 + 0.5 * pull : 0);
+  const target = load / rod.power;
+
+  // Drag smooths the climb and gives it back when you stop cranking.
+  const riseRate = (2.4 - reel.drag) * (assisted ? 0.6 : 1);
+  const fallRate = 0.45 + reel.drag * 0.95;
+  if (target > a.tension) a.tension = Math.min(target, a.tension + riseRate * dt);
+  else a.tension = Math.max(target, a.tension - fallRate * dt);
+
+  // Line management. Crank and you gain, but a hot fish takes it back.
+  const speed = reel.retrieve * 6.5 * (assisted ? 1.25 : 1);
+  if (reeling) f.distance -= speed * (1 - 0.55 * a.tension) * dt;
+  else         f.distance += pull * 0.085 * (1 - reel.drag * 0.4) * dt;
+  f.distance = Math.min(f.distance, a.castDist + a.depth + 40);
+
+  // Fish tires from fighting the drag, plus a little just from swimming.
+  const drain = (3.2 + a.tension * (reeling ? 20 : 9)) * (assisted ? 1.2 : 1) * style.drain;
+  f.stamina = Math.max(0, f.stamina - drain * dt);
+
+  // Line damage is cumulative and permanent for the rest of the fight.
+  // Nursing a fish just under the safe mark costs you nothing; muscling it
+  // frays the line a little at a time until something gives. This is what
+  // makes pumping and winding the right answer instead of just holding on.
+  if (a.tension > SAFE_TENSION) {
+    const over = (a.tension - SAFE_TENSION) / (1 - SAFE_TENSION);
+    const guard = 1.25 - reel.drag * 0.5;      // a good drag saves your line
+    a.wear += over * over * 4.0 * guard * (assisted ? 0.7 : 1) * dt;
+    if (a.wear >= 1) { breakOff(game, a, partner, assisted); return; }
+  }
+
+  if (f.distance <= 0) land(game, a, partner, assisted);
+}
+
+function breakOff(game, a, partner, assisted) {
+  const f = a.fish;
+  a.phase = PHASE.RESULT;
+  a.result = { ok: false, fish: f, text: 'LINE SNAPPED', sub: `${f.sp.name}, about ${f.weight.toFixed(1)} lb` };
+  a.resultTimer = 2.6;
+  a.lost++; a.streak = 0; a.tension = 0; a.wear = 0; a.fish = null;
+  a.hadAssist = false; a.hadPartnerOn = false;
+  if (partner) partner.assisting = false;
+  logLine(game, `${a.name} lost a ${f.weight.toFixed(1)} lb ${f.sp.name} - line snapped.`, 'bad');
+}
+
+/* What a fish is worth at the dock, before any crew bonuses. Charter
+   rewards are priced off this so the board can never out-earn fishing. */
+function dockValue(sp, weight) {
+  const scarcity = sp.rarity < 10 ? 1.6 : sp.rarity < 25 ? 1.25 : 1;
+  return weight * sp.ppl * scarcity;
+}
+
+function land(game, a, partner, assisted) {
+  const f = a.fish, sp = f.sp;
+
+  // Both rods bent at once pays a crew bonus to both anglers, but only
+  // counts as one double header on the tally.
+  const doubleHeader = a.hadPartnerOn;
+  const netted = assisted || a.hadAssist;
+  let mult = 1;
+  if (doubleHeader) { mult += 0.25; if (partner && partner.phase === PHASE.FIGHT) game.doubleHeaders++; }
+  if (netted)       { mult += 0.15; game.assists++; }
+  if (a.streak >= 3) mult += Math.min(0.2, 0.05 * (a.streak - 2));
+
+  // Records pay a bounty, so chasing a personal best is worth it.
+  const prev = game.records[sp.id];
+  const isRecord = !prev || f.weight > prev.weight;
+  const base = dockValue(sp, f.weight);
+  const value = Math.round(base * mult * (isRecord ? 1.5 : 1)) + 10;
+
+  game.cash += value;
+  game.totalEarned += value;
+  game.totalCaught++;
+  a.caught++; a.streak++;
+  a.heaviest = Math.max(a.heaviest, f.weight);
+  a.xp += Math.max(4, Math.round(value / 6));
+  a.level = levelFor(a.xp);
+
+  if (isRecord) {
+    game.records[sp.id] = { weight: f.weight, length: f.length, by: a.name, spot: SPOTS[game.spot].name };
+  }
+  if (netted && partner) {
+    const cut = Math.max(3, Math.round(value * 0.15));
+    partner.xp += Math.max(2, Math.round(cut / 4));
+    partner.level = levelFor(partner.xp);
+    partner.assisting = false;
+  }
+
+  a.phase = PHASE.RESULT;
+  a.result = {
+    ok: true, fish: f, value, isRecord, doubleHeader, assisted: netted,
+    text: isRecord ? 'NEW RECORD!' : 'FISH ON THE BOAT',
+    sub: `${sp.name} - ${f.weight.toFixed(1)} lb, ${f.length.toFixed(0)} in`,
+  };
+  a.resultTimer = 3.0;
+  a.tension = 0; a.wear = 0; a.fish = null;
+  a.hadAssist = false; a.hadPartnerOn = false;
+
+  // The charter board reads every fish that reaches the boat.
+  if (typeof checkCharters === 'function') {
+    checkCharters(game, a, f, { doubleHeader, netted, value });
+  }
+
+  let msg = `${a.name} landed a ${f.weight.toFixed(1)} lb ${sp.name} (+$${value})`;
+  if (isRecord) msg += ' - lake record!';
+  if (doubleHeader) msg += ' [double header]';
+  if (netted) msg += ' [netted by partner]';
+  logLine(game, msg, isRecord ? 'record' : 'good');
+}
+
+/* --------------------------------------------------------------- */
+/* Per-angler update                                                */
+/* --------------------------------------------------------------- */
+function stepAngler(game, a, dt, input, partner) {
+  const reel = reelOf(a), rod = rodOf(a), lure = lureOf(a);
+  const maxD = maxDepthFor(game, a);
+
+  switch (a.phase) {
+    case PHASE.IDLE: {
+      // Idle anglers can hold their action key to net a partner's fish.
+      a.assisting = input.action && partner && partner.phase === PHASE.FIGHT;
+      if (input.actionPressed && !a.assisting) {
+        a.phase = PHASE.AIMING; a.power = 0; a.powerDir = 1;
+      }
+      break;
+    }
+
+    case PHASE.AIMING: {
+      a.power += a.powerDir * dt * 1.55;
+      if (a.power >= 1) { a.power = 1; a.powerDir = -1; }
+      if (a.power <= 0) { a.power = 0; a.powerDir = 1; }
+      if (!input.action) {
+        a.castDist = Math.round(6 + rod.cast * a.power);
+        a.depth = 0; a.action = 0.35;
+        a.phase = PHASE.SINKING;
+      }
+      break;
+    }
+
+    case PHASE.SINKING: {
+      // Depth control. Sink with down, crank back up with up.
+      // Heavier lures punch down faster - that is why the deep spots
+      // want the big metal, not a worm.
+      const sinkRate = 9 + lure.size * 4.5;
+      if (input.down)    a.depth += sinkRate * dt;
+      else if (input.up) a.depth -= reel.retrieve * 9 * dt;
+      else               a.depth += sinkRate * 0.35 * dt;
+      a.depth = Math.max(0, Math.min(maxD, a.depth));
+
+      // Working the rod builds action, which is what draws strikes.
+      a.action = Math.max(0, a.action - dt * 0.85);
+      if (input.actionPressed) a.action = Math.min(1.6, a.action + 0.42);
+
+      // Reel all the way back to the boat to pick a new spot or lure.
+      if (a.depth <= 0 && input.up) { a.phase = PHASE.IDLE; a.action = 0; break; }
+
+      const sp = rollBite(game, a, dt);
+      if (sp) {
+        a.fish = makeFish(sp, a);
+        a.fish.startDistance = a.fish.distance;
+        a.biteWindow = 0.42 + rod.sensitivity * 0.75;
+        a.biteTimer = a.biteWindow;
+        a.phase = PHASE.BITE;
+        if (window.blip) window.blip('bite');
+      }
+      break;
+    }
+
+    case PHASE.BITE: {
+      a.biteTimer -= dt;
+      if (input.actionPressed) {
+        a.phase = PHASE.FIGHT; a.tension = 0.25; a.wear = 0;
+        a.hadAssist = false; a.hadPartnerOn = false;
+        if (window.blip) window.blip('hookup');
+      } else if (a.biteTimer <= 0) {
+        const sp = a.fish.sp;
+        a.fish = null; a.phase = PHASE.SINKING; a.action = 0.2; a.streak = 0;
+        logLine(game, `${a.name} was slow on the hookset - the ${sp.name} spat it.`, 'bad');
+      }
+      break;
+    }
+
+    case PHASE.FIGHT:
+      stepFight(game, a, dt, input, partner);
+      break;
+
+    case PHASE.RESULT: {
+      a.resultTimer -= dt;
+      if (a.resultTimer <= 0 || input.actionPressed) {
+        a.phase = PHASE.IDLE; a.result = null; a.depth = 0; a.action = 0;
+      }
+      break;
+    }
+  }
+}
+
+function logLine(game, text, kind) {
+  game.log.unshift({ text, kind, t: game.time });
+  if (game.log.length > 60) game.log.pop();
+}
+</script>
+<script>
+/* ---- src/charters.js ---- */
+/* =====================================================================
+   Deep Water Duo - charter board
+   Three shared jobs at a time, taken by the crew rather than by one
+   angler. They give the boat a reason to go somewhere specific instead
+   of parking on the highest paying fish, and they keep paying out after
+   the last reel has been bought.
+   ===================================================================== */
+
+const CHARTER_KINDS = ['count', 'trophy', 'variety', 'spot', 'teamwork'];
+
+/* What the crew can plausibly catch with what they own and where they
+   can sail. Charters are only ever drawn from this, so the board can
+   never ask for a fish that is out of reach. */
+function reachableSpecies(game) {
+  const reach = Math.max(...game.anglers.map(a => REELS[a.reel].maxDepth));
+  const ownedLures = new Set(game.anglers.flatMap(a => a.owned.lures));
+  const biggestLure = Math.max(...LURES.filter(l => ownedLures.has(l.id)).map(l => l.size));
+  const deepestSpot = Math.max(...SPOTS.filter((s, i) => canTravel(game, i)).map(s => s.bottom));
+  const ceiling = Math.min(reach, deepestSpot);
+  return SPECIES.filter(sp => sp.min <= ceiling && sp.minLure <= biggestLure);
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+/* The average fish the crew is actually pulling in right now, in dollars.
+   Every reward is a multiple of this, so a charter is a bonus on top of
+   fishing rather than a replacement for it. */
+function crewUnitValue(game) {
+  const pool = reachableSpecies(game);
+  if (!pool.length) return 20;
+  let num = 0, den = 0;
+  for (const sp of pool) {
+    const w = sp.wMin + (sp.wMax - sp.wMin) * 0.35;   // catches skew small
+    num += sp.rarity * dockValue(sp, w);
+    den += sp.rarity;
+  }
+  return Math.max(15, num / den);
+}
+
+function rollCharter(game, avoid) {
+  const pool = reachableSpecies(game);
+  if (!pool.length) return null;
+  const unit = crewUnitValue(game);
+  const kinds = CHARTER_KINDS.filter(k => !avoid || !avoid.includes(k));
+  const kind = pick(kinds.length ? kinds : CHARTER_KINDS);
+
+  switch (kind) {
+    case 'count': {
+      const sp = pick(pool);
+      const n = 3 + Math.floor(Math.random() * 4);
+      const each = dockValue(sp, sp.wMin + (sp.wMax - sp.wMin) * 0.35);
+      return mk(kind, `Land ${n} ${sp.name}`, n, each * n * 0.6, { species: sp.id });
+    }
+    case 'trophy': {
+      // Ask for a fish in the upper part of the species' range, so it is a
+      // real hunt but not a freak.
+      const sp = pick(pool);
+      const target = +(sp.wMin + (sp.wMax - sp.wMin) * 0.62).toFixed(1);
+      return mk(kind, `Land a ${sp.name} over ${target} lb`, 1,
+                dockValue(sp, target) * 1.2, { species: sp.id, minWeight: target });
+    }
+    case 'variety': {
+      const n = Math.min(pool.length, 3 + Math.floor(Math.random() * 3));
+      return mk(kind, `Land ${n} different species`, n, unit * n * 0.8, { seen: [] });
+    }
+    case 'spot': {
+      const options = SPOTS.map((s, i) => i).filter(i => canTravel(game, i));
+      const si = pick(options);
+      // This one ticks along while you fish normally, so it asks for more
+      // and pays less per fish than the charters you have to aim at.
+      const n = 8 + Math.floor(Math.random() * 7);
+      return mk(kind, `Land ${n} fish at ${SPOTS[si].name}`, n, unit * n * 0.45, { spot: si });
+    }
+    case 'teamwork': {
+      const double = Math.random() < 0.5;
+      const n = 2 + Math.floor(Math.random() * 2);
+      return double
+        ? mk(kind, `Pull off ${n} double headers`, n, unit * n * 1.6, { double: true })
+        : mk(kind, `Land ${n} fish with your partner on the net`, n, unit * n * 1.3, { netted: true });
+    }
+  }
+}
+
+function mk(kind, text, target, reward, data) {
+  return { kind, text, target, progress: 0, reward: Math.max(25, Math.round(reward)), ...data,
+           id: kind + '-' + Math.random().toString(36).slice(2, 8) };
+}
+
+function initCharters(game) {
+  game.charters = [];
+  for (let i = 0; i < 3; i++) {
+    const c = rollCharter(game, game.charters.map(x => x.kind));
+    if (c) game.charters.push(c);
+  }
+}
+
+/* Called once for every fish that reaches the boat. */
+function checkCharters(game, a, f, ctx) {
+  if (!game.charters) return;
+  for (let i = 0; i < game.charters.length; i++) {
+    const c = game.charters[i];
+    let hit = false;
+
+    switch (c.kind) {
+      case 'count':
+        if (c.species === f.sp.id) hit = true;
+        break;
+      case 'trophy':
+        if (c.species === f.sp.id && f.weight >= c.minWeight) hit = true;
+        break;
+      case 'variety':
+        if (!c.seen.includes(f.sp.id)) { c.seen.push(f.sp.id); hit = true; }
+        break;
+      case 'spot':
+        if (c.spot === game.spot) hit = true;
+        break;
+      case 'teamwork':
+        if (c.double && ctx.doubleHeader) hit = true;
+        if (c.netted && ctx.netted) hit = true;
+        break;
+    }
+    if (!hit) continue;
+
+    c.progress++;
+    if (c.progress >= c.target) {
+      game.cash += c.reward;
+      game.totalEarned += c.reward;
+      game.chartersDone = (game.chartersDone || 0) + 1;
+      logLine(game, `Charter complete: ${c.text} (+$${c.reward})`, 'record');
+      const fresh = rollCharter(game, game.charters.filter(x => x !== c).map(x => x.kind));
+      if (fresh) game.charters[i] = fresh; else game.charters.splice(i--, 1);
+      if (window.blip) window.blip('buy');
+    }
+  }
+}
+
+function renderCharters(el, game) {
+  if (!game.charters || !game.charters.length) {
+    el.innerHTML = '<div class="empty">No charters on the board.</div>';
+    return;
+  }
+  el.innerHTML = game.charters.map(c => {
+    const pct = Math.min(100, (c.progress / c.target) * 100);
+    return `<div class="ch">
+      <div class="chtop">
+        <span class="cht">${c.text}</span>
+        <span class="chp">${c.progress}/${c.target}</span>
+        <span class="chr">$${c.reward}</span>
+      </div>
+      <div class="chbar"><i style="width:${pct}%"></i></div>
+    </div>`;
+  }).join('');
+}
+</script>
+<script>
+/* ---- src/render.js ---- */
+/* =====================================================================
+   Deep Water Duo - canvas rendering
+   One shared cross-section of the lake with both anglers' lines in it.
+   ===================================================================== */
+
+const LANE = [0.34, 0.66];               // where each angler's line hangs
+const P_COLOR = ['#5fc9f0', '#ffb35c'];  // player 1 / player 2 accent
+
+let ambient = [];
+let ripples = [];
+
+function seedAmbient(game) {
+  const spot = SPOTS[game.spot];
+  ambient = [];
+  const n = 14;
+  for (let i = 0; i < n; i++) {
+    const sp = pickAmbientSpecies(spot);
+    if (!sp) continue;
+    ambient.push({
+      sp,
+      x: Math.random(),
+      depth: sp.min + Math.random() * Math.min(spot.bottom - sp.min, sp.max - sp.min),
+      dir: Math.random() < 0.5 ? -1 : 1,
+      speed: 0.008 + Math.random() * 0.022,
+      bob: Math.random() * 6.28,
+      scale: 0.5 + Math.random() * 0.7,
+    });
+  }
+}
+
+function pickAmbientSpecies(spot) {
+  const ok = SPECIES.filter(s => s.min < spot.bottom);
+  if (!ok.length) return null;
+  const total = ok.reduce((s, x) => s + x.rarity, 0);
+  let r = Math.random() * total;
+  for (const s of ok) { r -= s.rarity; if (r <= 0) return s; }
+  return ok[0];
+}
+
+function updateAmbient(dt) {
+  for (const f of ambient) {
+    f.x += f.dir * f.speed * dt;
+    f.bob += dt * 1.6;
+    if (f.x < -0.1) { f.x = 1.1; }
+    if (f.x > 1.1)  { f.x = -0.1; }
+  }
+  ripples = ripples.filter(r => (r.life -= dt) > 0);
+}
+
+function addRipple(x, y) { ripples.push({ x, y, life: 0.9, max: 0.9 }); }
+
+/* --------------------------------------------------------------- */
+function draw(ctx, W, H, game, t) {
+  const spot = SPOTS[game.spot];
+  const skyH = Math.round(H * 0.17);
+  const waterTop = skyH;
+  const waterH = H - skyH;
+
+  // Feet-to-pixel mapping for this spot.
+  const bottom = spot.bottom;
+  const ftToY = ft => waterTop + (ft / bottom) * waterH;
+
+  drawSky(ctx, W, skyH, t);
+  drawWater(ctx, W, waterTop, waterH, bottom, t);
+  drawDepthRuler(ctx, W, waterTop, waterH, bottom, game);
+  drawAmbient(ctx, W, ftToY, t);
+  drawBottom(ctx, W, H, waterTop, waterH, spot, t);
+  drawBoat(ctx, W, skyH, t);
+
+  for (let i = 0; i < 2; i++) drawAnglerLine(ctx, W, H, skyH, ftToY, game, game.anglers[i], i, t);
+  drawRipples(ctx, waterTop);
+}
+
+function drawSky(ctx, W, h, t) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#0e2338');
+  g.addColorStop(1, '#2c5670');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, h);
+
+  // Far treeline so the horizon is not a bare edge.
+  ctx.fillStyle = '#132a20';
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let x = 0; x <= W; x += 14) {
+    const n = Math.sin(x * 0.031) * 6 + Math.sin(x * 0.011 + 2) * 9;
+    ctx.lineTo(x, h - 16 - n);
+  }
+  ctx.lineTo(W, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawWater(ctx, W, top, h, bottom, t) {
+  const g = ctx.createLinearGradient(0, top, 0, top + h);
+  g.addColorStop(0.00, '#1b6f8f');
+  g.addColorStop(0.18, '#146079');
+  g.addColorStop(0.45, '#0c4157');
+  g.addColorStop(0.75, '#062a3b');
+  g.addColorStop(1.00, '#02141f');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, top, W, h);
+
+  // Surface chop.
+  ctx.strokeStyle = 'rgba(190,235,255,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 6) {
+    const y = top + Math.sin(x * 0.035 + t * 1.7) * 2.2 + Math.sin(x * 0.09 + t * 2.6) * 1.1;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Thermocline: the temperature break the deep fish sit under.
+  if (bottom > 45) {
+    const y = top + (Math.min(bottom * 0.42, 55) / bottom) * h;
+    ctx.strokeStyle = 'rgba(160,220,255,0.13)';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Suspended particles drifting in the light.
+  ctx.fillStyle = 'rgba(200,230,255,0.10)';
+  for (let i = 0; i < 60; i++) {
+    const px = ((i * 137.5) % W);
+    const py = top + ((i * 71.3 + t * 8) % h);
+    ctx.fillRect(px, py, 2, 2);
+  }
+}
+
+function drawDepthRuler(ctx, W, top, h, bottom, game) {
+  ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'left';
+  const step = bottom <= 40 ? 5 : bottom <= 120 ? 20 : 40;
+  for (let ft = 0; ft <= bottom; ft += step) {
+    const y = top + (ft / bottom) * h;
+    ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,225,240,0.45)';
+    ctx.fillText(ft + ' ft', 6, y - 3);
+  }
+
+  // Mark where each angler runs out of line.
+  for (let i = 0; i < 2; i++) {
+    const a = game.anglers[i];
+    const cap = REELS[a.reel].maxDepth;
+    if (cap >= bottom) continue;
+    const y = top + (cap / bottom) * h;
+    ctx.strokeStyle = P_COLOR[i] + '55';
+    ctx.setLineDash([7, 6]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = P_COLOR[i] + 'aa';
+    ctx.textAlign = 'right';
+    ctx.fillText(`P${i + 1} line ends`, W - 8, y - 4);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawBottom(ctx, W, H, top, h, spot, t) {
+  const baseY = top + h;
+  ctx.fillStyle = '#06141c';
+  ctx.beginPath();
+  ctx.moveTo(0, baseY);
+  for (let x = 0; x <= W; x += 10) {
+    const n = Math.sin(x * 0.017) * 7 + Math.sin(x * 0.006 + 1.3) * 11;
+    ctx.lineTo(x, baseY - 14 - n);
+  }
+  ctx.lineTo(W, baseY);
+  ctx.closePath();
+  ctx.fill();
+
+  // A little structure so each spot reads differently.
+  ctx.fillStyle = 'rgba(20,60,40,0.55)';
+  if (spot.id === 'cove' || spot.id === 'flats') {
+    for (let i = 0; i < 22; i++) {
+      const x = (i * 61 + 30) % W;
+      const hgt = 30 + ((i * 37) % 55);
+      ctx.beginPath();
+      ctx.moveTo(x, baseY);
+      ctx.quadraticCurveTo(x + Math.sin(t + i) * 10, baseY - hgt / 2, x + Math.sin(t * 0.7 + i) * 6, baseY - hgt);
+      ctx.lineTo(x + 5, baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+}
+
+function drawAmbient(ctx, W, ftToY, t) {
+  for (const f of ambient) {
+    const x = f.x * W;
+    const y = ftToY(f.depth) + Math.sin(f.bob) * 3;
+    drawFish(ctx, x, y, 14 * f.scale, f.dir, f.sp, 0.32);
+  }
+}
+
+/* A simple stylised fish: body, tail, fin, eye. */
+function drawFish(ctx, x, y, len, dir, sp, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(dir, 1);
+  const hgt = len * 0.42;
+
+  ctx.fillStyle = sp.color;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, len * 0.5, hgt * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = sp.belly;
+  ctx.beginPath();
+  ctx.ellipse(0, hgt * 0.14, len * 0.42, hgt * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = sp.color;
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.46, 0);
+  ctx.lineTo(-len * 0.72, -hgt * 0.55);
+  ctx.lineTo(-len * 0.72, hgt * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-len * 0.1, -hgt * 0.42);
+  ctx.lineTo(len * 0.12, -hgt * 0.85);
+  ctx.lineTo(len * 0.2, -hgt * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#04121a';
+  ctx.beginPath();
+  ctx.arc(len * 0.3, -hgt * 0.12, Math.max(1, len * 0.045), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBoat(ctx, W, skyH, t) {
+  const cx = W * 0.5;
+  const y = skyH + Math.sin(t * 1.4) * 2;
+
+  ctx.fillStyle = '#2b2018';
+  ctx.beginPath();
+  ctx.moveTo(cx - 120, y - 14);
+  ctx.lineTo(cx + 120, y - 14);
+  ctx.lineTo(cx + 96, y + 6);
+  ctx.lineTo(cx - 96, y + 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#3c2d21';
+  ctx.fillRect(cx - 120, y - 18, 240, 5);
+
+  // Two anglers, one at each gunwale, rods out over their own lane.
+  for (let i = 0; i < 2; i++) {
+    const px = i === 0 ? cx - 62 : cx + 62;
+    ctx.fillStyle = P_COLOR[i];
+    ctx.beginPath();
+    ctx.arc(px, y - 42, 7, 0, Math.PI * 2);   // head
+    ctx.fill();
+    ctx.fillRect(px - 7, y - 34, 14, 20);      // body
+    // Rod pointing towards the lane.
+    const dir = i === 0 ? -1 : 1;
+    ctx.strokeStyle = '#d8c9a8';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(px, y - 30);
+    ctx.quadraticCurveTo(px + dir * 40, y - 62, px + dir * 92, y - 52);
+    ctx.stroke();
+  }
+}
+
+function rodTip(W, skyH, i) {
+  const cx = W * 0.5;
+  const px = i === 0 ? cx - 62 : cx + 62;
+  const dir = i === 0 ? -1 : 1;
+  return { x: px + dir * 92, y: skyH - 52 };
+}
+
+function drawAnglerLine(ctx, W, H, skyH, ftToY, game, a, i, t) {
+  const tip = rodTip(W, skyH, i);
+  const laneX = W * LANE[i];
+  const col = P_COLOR[i];
+
+  if (a.phase === PHASE.IDLE || a.phase === PHASE.RESULT) {
+    // Slack line hanging off the tip.
+    ctx.strokeStyle = 'rgba(230,245,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.quadraticCurveTo(tip.x + (i ? 8 : -8), tip.y + 22, tip.x + (i ? 14 : -14), tip.y + 34);
+    ctx.stroke();
+    if (a.phase === PHASE.RESULT && a.result) drawResultCard(ctx, laneX, skyH + 90, a, col);
+    if (a.assisting) drawAssist(ctx, laneX, skyH + 60, col);
+    return;
+  }
+
+  if (a.phase === PHASE.AIMING) {
+    drawCastMeter(ctx, laneX, skyH + 50, a, col);
+    ctx.strokeStyle = 'rgba(230,245,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(tip.x + (i ? 12 : -12), tip.y + 30); ctx.stroke();
+    return;
+  }
+
+  // Lure position: cast distance pushes it out towards its lane.
+  const lureY = ftToY(a.depth);
+  const lureX = laneX;
+
+  // Line from rod tip, with a bend proportional to load.
+  const bend = a.phase === PHASE.FIGHT ? a.tension * 46 : 6;
+  ctx.strokeStyle = a.phase === PHASE.FIGHT
+    ? (a.tension > 0.82 ? '#ff6b5c' : a.tension > 0.6 ? '#ffd166' : 'rgba(235,250,255,0.8)')
+    : 'rgba(235,250,255,0.6)';
+  ctx.lineWidth = a.phase === PHASE.FIGHT ? 2 : 1.2;
+  ctx.beginPath();
+  ctx.moveTo(tip.x, tip.y);
+  const midX = (tip.x + lureX) / 2 + (i ? bend : -bend) * 0.35;
+  const midY = (tip.y + lureY) / 2;
+  ctx.quadraticCurveTo(midX, midY, lureX, lureY);
+  ctx.stroke();
+
+  if (a.phase === PHASE.FIGHT && a.fish) {
+    const f = a.fish;
+    const size = 16 + Math.min(70, f.weight * 1.5);
+    const shake = a.tension * 6;
+    drawFish(ctx,
+      lureX + Math.sin(t * 9) * shake,
+      lureY + Math.cos(t * 7) * shake * 0.6,
+      size, i ? 1 : -1, f.sp, 0.95);
+    drawFightGauge(ctx, lureX, lureY - size * 0.5 - 26, a, col);
+  } else {
+    // The lure itself.
+    const lure = LURES[a.lure];
+    ctx.fillStyle = '#f2e6c8';
+    ctx.strokeStyle = '#8f7a45';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(lureX, lureY, 3 + lure.size, 2 + lure.size * 0.6, 0.4, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+
+    // Action halo: the harder you work it, the more it calls fish in.
+    if (a.action > 0.05) {
+      ctx.strokeStyle = col + Math.round(Math.min(0.55, a.action * 0.4) * 255).toString(16).padStart(2, '0');
+      ctx.lineWidth = 2;
+      for (let r = 1; r <= 3; r++) {
+        ctx.beginPath();
+        ctx.arc(lureX, lureY, 8 + r * 9 * a.action, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    if (a.phase === PHASE.BITE) drawBiteAlert(ctx, lureX, lureY, a, col, t);
+  }
+
+  // Depth readout beside the lure.
+  ctx.font = 'bold 12px ui-monospace, Menlo, Consolas, monospace';
+  ctx.fillStyle = col;
+  ctx.textAlign = i ? 'left' : 'right';
+  ctx.fillText(`${a.depth.toFixed(0)} ft`, lureX + (i ? 22 : -22), lureY + 4);
+  ctx.textAlign = 'left';
+}
+
+function drawCastMeter(ctx, x, y, a, col) {
+  const w = 150, h = 14;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x - w / 2 - 3, y - 3, w + 6, h + 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(x - w / 2, y, w, h);
+  ctx.fillStyle = col;
+  ctx.fillRect(x - w / 2, y, w * a.power, h);
+  ctx.font = 'bold 11px ui-monospace, monospace';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText('RELEASE TO CAST', x, y - 8);
+  ctx.textAlign = 'left';
+}
+
+function drawBiteAlert(ctx, x, y, a, col, t) {
+  const pulse = 1 + Math.sin(t * 22) * 0.18;
+  ctx.save();
+  ctx.translate(x, y - 42);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = '#ff4d4d';
+  ctx.font = 'bold 30px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', 0, 0);
+  ctx.restore();
+
+  const frac = Math.max(0, a.biteTimer / a.biteWindow);
+  const w = 70;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(x - w / 2, y - 34, w, 6);
+  ctx.fillStyle = '#ff4d4d';
+  ctx.fillRect(x - w / 2, y - 34, w * frac, 6);
+  ctx.textAlign = 'left';
+}
+
+function drawFightGauge(ctx, x, y, a, col) {
+  const f = a.fish;
+  const w = 120;
+
+  // Tension bar - the thing that will cost you the fish.
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, 27);
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillRect(x - w / 2, y, w, 8);
+  const tc = a.tension > 0.82 ? '#ff5c4d' : a.tension > 0.6 ? '#ffd166' : '#5ddc8a';
+  ctx.fillStyle = tc;
+  ctx.fillRect(x - w / 2, y, w * Math.min(1, a.tension), 8);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillRect(x - w / 2 + w * SAFE_TENSION, y - 2, 1.5, 12);
+
+  // Line wear: damage already done, and it does not heal.
+  const wear = Math.min(1, a.wear || 0);
+  if (wear > 0.01) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(x - w / 2, y + 9, w, 4);
+    ctx.fillStyle = wear > 0.66 ? '#ff5c4d' : '#ffd166';
+    ctx.fillRect(x - w / 2, y + 9, w * wear, 4);
+  }
+
+  // Remaining line to the boat.
+  const prog = 1 - Math.min(1, f.distance / Math.max(1, f.startDistance));
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillRect(x - w / 2, y + 15, w, 6);
+  ctx.fillStyle = col;
+  ctx.fillRect(x - w / 2, y + 15, w * prog, 6);
+
+  ctx.font = 'bold 10px ui-monospace, monospace';
+  ctx.fillStyle = '#e8f4ff';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${f.distance.toFixed(0)} ft out`, x, y - 6);
+  ctx.textAlign = 'left';
+}
+
+function drawResultCard(ctx, x, y, a, col) {
+  const r = a.result;
+  const w = 220, h = 58;
+  ctx.fillStyle = r.ok ? 'rgba(10,40,25,0.9)' : 'rgba(50,14,14,0.9)';
+  ctx.strokeStyle = r.ok ? (r.isRecord ? '#ffd166' : '#5ddc8a') : '#ff5c4d';
+  ctx.lineWidth = 2;
+  ctx.fillRect(x - w / 2, y, w, h);
+  ctx.strokeRect(x - w / 2, y, w, h);
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 15px system-ui, sans-serif';
+  ctx.fillStyle = r.ok ? (r.isRecord ? '#ffd166' : '#8df0b0') : '#ff8f85';
+  ctx.fillText(r.text, x, y + 22);
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.fillStyle = '#dbe8f0';
+  ctx.fillText(r.sub, x, y + 40);
+  if (r.ok) {
+    ctx.font = 'bold 12px ui-monospace, monospace';
+    ctx.fillStyle = '#8df0b0';
+    ctx.fillText(`+$${r.value}`, x, y + 54);
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawAssist(ctx, x, y, col) {
+  ctx.font = 'bold 13px system-ui, sans-serif';
+  ctx.fillStyle = col;
+  ctx.textAlign = 'center';
+  ctx.fillText('NETTING FOR PARTNER', x, y);
+  ctx.textAlign = 'left';
+}
+
+function drawRipples(ctx, top) {
+  for (const r of ripples) {
+    const k = 1 - r.life / r.max;
+    ctx.strokeStyle = `rgba(220,245,255,${(1 - k) * 0.5})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(r.x, top, 6 + k * 45, 2 + k * 9, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+</script>
+<script>
+/* ---- src/ui.js ---- */
+/* =====================================================================
+   Deep Water Duo - HUD, shop and travel menu
+   The shop is keyboard driven so both players can browse at once,
+   each with their own keys, without fighting over a mouse.
+   ===================================================================== */
+
+const TABS = ['RODS', 'REELS', 'LURES', 'TRAVEL', 'REGISTER'];
+
+function makeShopState() { return { open: false, tab: 0, index: 0, flash: '', flashT: 0, lastHtml: null }; }
+
+/* What is listed under the current tab for this angler. */
+function shopRows(game, a, tab) {
+  switch (TABS[tab]) {
+    case 'RODS':  return RODS.map((r, i)  => rowGear(game, a, r, i, 'rods',  a.rod));
+    case 'REELS': return REELS.map((r, i) => rowGear(game, a, r, i, 'reels', a.reel));
+    case 'LURES': return LURES.map((r, i) => rowGear(game, a, r, i, 'lures', a.lure));
+    case 'REGISTER': return SPECIES.map((sp, i) => rowSpecies(game, a, sp, i));
+    case 'TRAVEL':return SPOTS.map((s, i) => {
+      const reachable = canTravel(game, i);
+      const here = game.spot === i;
+      return {
+        id: s.id, name: s.name, price: 0, obj: s, kind: 'travel', idx: i,
+        state: here ? 'here' : reachable ? 'go' : 'locked',
+        note: here ? 'anchored here'
+            : reachable ? `${s.bottom} ft to the bottom`
+            : `needs ${s.needDepth} ft of line on a reel`,
+        blurb: s.blurb,
+      };
+    });
+  }
+  return [];
+}
+
+function rowSpecies(game, a, sp, i) {
+  const rec = game.records[sp.id];
+  const spot = SPOTS[game.spot];
+  const lure = lureOf(a);
+  const reach = reelOf(a).maxDepth;
+
+  // Say the first concrete reason this fish is out of reach right now.
+  let why;
+  if (sp.min > spot.bottom)      why = `not in this water - needs ${sp.min} ft or deeper`;
+  else if (sp.min > reach)       why = `below your line - needs a ${sp.min} ft reel`;
+  else if (lure.size < sp.minLure) why = `ignores this lure - needs size ${sp.minLure} or bigger`;
+  else if (!lure.tags.some(t => sp.tags.includes(t))) why = 'will only nip at this lure';
+  else if (sp.min > lure.max || sp.max < lure.min) why = 'holds outside this lure\'s depth band';
+  else                           why = `catchable right now at ${sp.min}-${Math.min(sp.max, reach)} ft`;
+
+  return {
+    id: sp.id, name: sp.name, price: 0, obj: sp, kind: 'register', idx: i,
+    state: rec ? 'owned' : 'locked',
+    note: `${sp.min}-${sp.max} ft · lure size ${sp.minLure}+ · ${sp.tags.join(', ')} · $${sp.ppl}/lb`,
+    blurb: rec
+      ? `Record: ${rec.weight.toFixed(1)} lb, ${rec.length.toFixed(0)} in by ${rec.by} at ${rec.spot}. Fights ${styleOf(sp).tell}.`
+      : why.charAt(0).toUpperCase() + why.slice(1) + '.',
+    right: rec ? `${rec.weight.toFixed(1)} lb` : '—',
+  };
+}
+
+function rowGear(game, a, item, i, bucket, equippedIdx) {
+  const owned = a.owned[bucket].includes(item.id);
+  const equipped = equippedIdx === i;
+  return {
+    id: item.id, name: item.name, price: item.price, obj: item, kind: bucket, idx: i,
+    state: equipped ? 'equipped' : owned ? 'owned' : (game.cash >= item.price ? 'buy' : 'poor'),
+    note: gearNote(item, bucket),
+    blurb: item.blurb,
+  };
+}
+
+function gearNote(item, bucket) {
+  if (bucket === 'rods')  return `power ${item.power} lb · sens ${(item.sensitivity * 100) | 0}% · cast ${item.cast} ft`;
+  if (bucket === 'reels') return `line ${item.maxDepth} ft · retrieve ${item.retrieve.toFixed(1)} · drag ${(item.drag * 100) | 0}%`;
+  return `depth ${item.min}-${item.max} ft · size ${item.size} · ${item.tags.join(', ')}`;
+}
+
+/* Act on the highlighted row. */
+function shopConfirm(game, a, shop) {
+  const rows = shopRows(game, a, shop.tab);
+  const row = rows[shop.index];
+  if (!row) return;
+
+  if (row.kind === 'register') {
+    const n = Object.keys(game.records).length;
+    return flash(shop, `${n} of ${SPECIES.length} species in the book.`);
+  }
+
+  if (row.kind === 'travel') {
+    if (row.state === 'locked') return flash(shop, 'You need a bigger reel to reach that water.');
+    if (row.state === 'here')   return flash(shop, 'Already anchored here.');
+    const busy = game.anglers.find(x => x.phase !== PHASE.IDLE && x.phase !== PHASE.RESULT);
+    if (busy) return flash(shop, `${busy.name} still has a line in the water.`);
+    game.spot = row.idx;
+    for (const x of game.anglers) { x.depth = 0; x.action = 0; }
+    seedAmbient(game);
+    logLine(game, `The crew moved to ${SPOTS[row.idx].name}.`, 'info');
+    return flash(shop, `Anchored at ${SPOTS[row.idx].name}.`);
+  }
+
+  if (row.state === 'equipped') return;
+  if (row.state === 'owned') { equip(a, row); return flash(shop, `${row.name} equipped.`); }
+  if (row.state === 'poor')  return flash(shop, `Short $${row.price - game.cash}.`);
+
+  game.cash -= row.price;
+  a.owned[row.kind].push(row.id);
+  equip(a, row);
+  logLine(game, `${a.name} bought the ${row.name} for $${row.price}.`, 'info');
+  flash(shop, `Bought ${row.name}!`);
+  if (window.blip) window.blip('buy');
+}
+
+function equip(a, row) {
+  if (row.kind === 'rods')  a.rod  = row.idx;
+  if (row.kind === 'reels') a.reel = row.idx;
+  if (row.kind === 'lures') a.lure = row.idx;
+}
+
+function flash(shop, msg) { shop.flash = msg; shop.flashT = 2.2; }
+
+/* --------------------------------------------------------------- */
+/* Rendering the shop panel                                         */
+/* --------------------------------------------------------------- */
+function renderShop(el, game, a, shop, keys) {
+  if (!shop.open) { el.style.display = 'none'; shop.lastHtml = null; return; }
+  el.style.display = 'block';
+  const rows = shopRows(game, a, shop.tab);
+  shop.index = Math.max(0, Math.min(rows.length - 1, shop.index));
+  const sel = rows[shop.index];
+
+  const tabs = TABS.map((t, i) =>
+    `<span class="tab ${i === shop.tab ? 'on' : ''}">${t}</span>`).join('');
+
+  const list = rows.map((r, i) => {
+    const cls = ['row', r.kind, i === shop.index ? 'sel' : '', r.state].join(' ');
+    let right;
+    if (r.right !== undefined) {
+      right = r.right;
+    } else if (r.kind === 'travel') {
+      right = r.state === 'here' ? 'HERE' : r.state === 'go' ? 'TRAVEL' : 'LOCKED';
+    } else {
+      right = r.state === 'equipped' ? 'EQUIPPED'
+            : r.state === 'owned'    ? 'OWNED'
+            : r.price === 0 ? 'FREE' : '$' + r.price.toLocaleString();
+    }
+    return `<div class="${cls}"><span class="nm">${r.name}</span><span class="rt">${right}</span></div>`;
+  }).join('');
+
+  const html = `
+    <div class="shop-head">
+      <b>${a.name}</b> · ${rankName(a.level)} lvl ${a.level}
+      <span class="tabs">${tabs}</span>
+    </div>
+    <div class="shop-list">${list}</div>
+    <div class="shop-detail">
+      <div class="dnote">${sel ? sel.note : ''}</div>
+      <div class="dblurb">${sel ? sel.blurb : ''}</div>
+      ${shop.flashT > 0 ? `<div class="dflash">${shop.flash}</div>` : ''}
+    </div>
+    <div class="shop-keys">${keys.up}/${keys.down} move · ${keys.tab} tab · ${keys.action} select · ${keys.shop} close</div>
+  `;
+  if (html === shop.lastHtml) return;
+  shop.lastHtml = html;
+  el.innerHTML = html;
+
+  // Keep the highlighted row on screen - the register runs to 17 entries.
+  const selEl = el.querySelector('.row.sel');
+  if (selEl) selEl.scrollIntoView({ block: 'nearest' });
+}
+
+/* --------------------------------------------------------------- */
+/* HUD                                                              */
+/* --------------------------------------------------------------- */
+function renderHud(el, game, a, i) {
+  const rod = RODS[a.rod], reel = REELS[a.reel], lure = LURES[a.lure];
+  const maxD = maxDepthFor(game, a);
+
+  let status, statusCls = '', tell = '';
+  switch (a.phase) {
+    case PHASE.IDLE:    status = a.assisting ? 'netting for partner' : 'ready to cast'; break;
+    case PHASE.AIMING:  status = 'winding up...'; break;
+    case PHASE.SINKING: status = `fishing at ${a.depth.toFixed(0)} ft`; break;
+    case PHASE.BITE:    status = 'FISH ON IT - SET THE HOOK'; statusCls = 'alert'; break;
+    case PHASE.FIGHT:   status = `fighting a ${a.fish.sp.name}`; statusCls = 'fight';
+                        tell = styleOf(a.fish.sp).tell; break;
+    case PHASE.RESULT:  status = a.result && a.result.ok ? 'boated it' : 'lost it'; break;
+  }
+
+  const tPct = Math.min(100, a.tension * 100);
+  const tCls = a.tension > SAFE_TENSION ? 'danger' : a.tension > 0.6 ? 'warn' : 'ok';
+  const stam = a.fish ? (a.fish.stamina / a.fish.maxStamina) * 100 : 0;
+  const wear = Math.min(100, (a.wear || 0) * 100);
+  const wCls = wear > 66 ? 'danger' : wear > 33 ? 'warn' : 'ok';
+
+  el.innerHTML = `
+    <div class="hud-top">
+      <span class="pname p${i}">${a.name}</span>
+      <span class="rank">${rankName(a.level)} · lvl ${a.level}</span>
+    </div>
+    <div class="status ${statusCls}">${status}</div>
+    ${tell ? `<div class="tell">${tell}</div>` : ''}
+    <div class="gear">
+      <div><span class="gl">ROD</span> ${rod.name} <span class="gs">${rod.power} lb</span></div>
+      <div><span class="gl">REEL</span> ${reel.name} <span class="gs">${reel.maxDepth} ft</span></div>
+      <div><span class="gl">LURE</span> ${lure.name} <span class="gs">${lure.min}-${lure.max} ft</span></div>
+    </div>
+    <div class="bars">
+      <div class="barlabel">line tension</div>
+      <div class="bar"><i class="${tCls}" style="width:${tPct}%"></i>
+        <u style="left:${SAFE_TENSION * 100}%"></u></div>
+      <div class="barlabel">line wear${wear > 60 ? ' <b class="fray">FRAYING</b>' : ''}</div>
+      <div class="bar"><i class="${wCls}" style="width:${wear}%"></i></div>
+      <div class="barlabel">fish stamina</div>
+      <div class="bar"><i class="stam" style="width:${stam}%"></i></div>
+    </div>
+    ${bitingPanel(game, a)}
+    <div class="stats">
+      caught <b>${a.caught}</b> · lost <b>${a.lost}</b> · best <b>${a.heaviest.toFixed(1)} lb</b><br>
+      line reaches <b>${maxD} ft</b> of ${SPOTS[game.spot].bottom} ft
+    </div>`;
+}
+
+/* Shows what the current rig can actually draw a strike from. While the
+   lure is down it reads the current depth, otherwise it previews the
+   best depth for each species so players can plan the drop. */
+function bitingPanel(game, a) {
+  const inWater = a.phase === PHASE.SINKING || a.phase === PHASE.BITE || a.phase === PHASE.FIGHT;
+  const rows = inWater
+    ? candidateBites(game, a).map(c => ({ sp: c.sp, rate: c.rate, depth: a.depth }))
+    : surveySpecies(game, a);
+
+  const title = inWater ? `interested at ${a.depth.toFixed(0)} ft` : `this rig can catch`;
+  if (!rows.length) {
+    return `<div class="biting"><h4>${title}</h4>
+      <div class="none">${inWater
+        ? 'Nothing is looking at it here. Try another depth.'
+        : 'Nothing here wants this lure. Change lures or move.'}</div></div>`;
+  }
+
+  const top = rows.slice(0, 4);
+  const max = top[0].rate;
+  const list = top.map(r => `
+    <div class="bt">
+      <span class="sw" style="background:${r.sp.color}"></span>
+      <span class="bn">${r.sp.name}</span>
+      ${inWater ? '' : `<span class="bn" style="flex:none;color:#7f9aad">${r.depth.toFixed(0)} ft</span>`}
+      <span class="bb"><i style="width:${Math.max(8, (r.rate / max) * 100)}%"></i></span>
+    </div>`).join('');
+  return `<div class="biting"><h4>${title}</h4>${list}</div>`;
+}
+
+function renderTopBar(el, game) {
+  const spot = SPOTS[game.spot];
+  el.innerHTML = `
+    <span class="cash">$${game.cash.toLocaleString()}</span>
+    <span class="spot">${spot.name} <em>· ${spot.bottom} ft deep</em></span>
+    <span class="tally">${game.totalCaught} landed · ${game.doubleHeaders} double headers · ${game.assists} assists</span>`;
+}
+
+function renderLog(el, game) {
+  el.innerHTML = game.log.slice(0, 9)
+    .map(l => `<div class="l ${l.kind}">${l.text}</div>`).join('');
+}
+
+function renderRecords(el, game) {
+  const ids = Object.keys(game.records);
+  const count = document.getElementById('reccount');
+  if (count) count.textContent = `${ids.length} / ${SPECIES.length}`;
+  if (!ids.length) {
+    el.innerHTML = '<div class="empty">No records yet. Open the shop and tab to REGISTER to see what lives here.</div>';
+    return;
+  }
+  el.innerHTML = ids
+    .map(id => ({ id, r: game.records[id], sp: SPECIES.find(s => s.id === id) }))
+    .sort((a, b) => b.r.weight - a.r.weight)
+    .map(x => `<div class="rec"><span class="rn">${x.sp.name}</span>
+      <span class="rw">${x.r.weight.toFixed(1)} lb</span>
+      <span class="rb">${x.r.by}</span></div>`).join('');
+}
+</script>
+<script>
+/* ---- src/main.js ---- */
+/* =====================================================================
+   Deep Water Duo - input, main loop and persistence
+   ===================================================================== */
+
+const KEYS = [
+  { up: 'KeyW',    down: 'KeyS',      action: 'Space',      tab: 'KeyQ',   shop: 'KeyE',
+    label: { up: 'W', down: 'S', action: 'SPACE', tab: 'Q', shop: 'E' } },
+  { up: 'ArrowUp', down: 'ArrowDown', action: 'Enter',      tab: 'Slash',  shop: 'ShiftRight',
+    label: { up: '↑', down: '↓', action: 'ENTER', tab: '/', shop: 'R-SHIFT' } },
+];
+
+const held = new Set();
+const pressed = new Set();
+let game = newGame();
+const shops = [makeShopState(), makeShopState()];
+let started = false;
+
+/* --------------------------------------------------------------- */
+/* Input                                                            */
+/* --------------------------------------------------------------- */
+const WATCHED = new Set(KEYS.flatMap(k => [k.up, k.down, k.action, k.tab, k.shop]));
+
+addEventListener('keydown', e => {
+  if (WATCHED.has(e.code)) e.preventDefault();
+  if (!started) { started = true; document.getElementById('splash').style.display = 'none'; }
+  if (e.repeat) return;
+  if (WATCHED.has(e.code)) { held.add(e.code); pressed.add(e.code); }
+  if (e.code === 'KeyR' && e.shiftKey) resetGame();
+});
+
+addEventListener('keyup', e => { held.delete(e.code); });
+addEventListener('blur', () => held.clear());
+
+function readInput(i) {
+  const k = KEYS[i];
+  return {
+    up: held.has(k.up),
+    down: held.has(k.down),
+    action: held.has(k.action),
+    upPressed: pressed.has(k.up),
+    downPressed: pressed.has(k.down),
+    actionPressed: pressed.has(k.action),
+    tabPressed: pressed.has(k.tab),
+    shopPressed: pressed.has(k.shop),
+  };
+}
+
+/* --------------------------------------------------------------- */
+/* Audio - a few short synthesised blips, no asset files needed     */
+/* --------------------------------------------------------------- */
+let actx = null;
+window.blip = function (kind) {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    const now = actx.currentTime;
+    const cfg = {
+      bite:   { f: 880, to: 1320, d: 0.16, v: 0.16, type: 'square'   },
+      hookup: { f: 420, to:  180, d: 0.22, v: 0.18, type: 'sawtooth' },
+      buy:    { f: 660, to:  990, d: 0.14, v: 0.13, type: 'triangle' },
+      snap:   { f: 300, to:   60, d: 0.30, v: 0.20, type: 'sawtooth' },
+    }[kind] || { f: 500, to: 500, d: 0.1, v: 0.1, type: 'sine' };
+    o.type = cfg.type;
+    o.frequency.setValueAtTime(cfg.f, now);
+    o.frequency.exponentialRampToValueAtTime(cfg.to, now + cfg.d);
+    g.gain.setValueAtTime(cfg.v, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + cfg.d);
+    o.connect(g); g.connect(actx.destination);
+    o.start(now); o.stop(now + cfg.d + 0.02);
+  } catch (_) { /* audio is a nicety, never a crash */ }
+};
+
+/* --------------------------------------------------------------- */
+/* Persistence                                                      */
+/* --------------------------------------------------------------- */
+const SAVE_KEY = 'deepwaterduo.v1';
+
+function save() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      cash: game.cash, spot: game.spot, records: game.records,
+      totalCaught: game.totalCaught, totalEarned: game.totalEarned,
+      doubleHeaders: game.doubleHeaders, assists: game.assists,
+      charters: game.charters, chartersDone: game.chartersDone,
+      anglers: game.anglers.map(a => ({
+        rod: a.rod, reel: a.reel, lure: a.lure, owned: a.owned,
+        xp: a.xp, level: a.level, caught: a.caught, lost: a.lost, heaviest: a.heaviest,
+      })),
+    }));
+  } catch (_) { /* file:// with storage disabled - just play unsaved */ }
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    Object.assign(game, {
+      cash: d.cash | 0, spot: d.spot | 0, records: d.records || {},
+      totalCaught: d.totalCaught | 0, totalEarned: d.totalEarned | 0,
+      doubleHeaders: d.doubleHeaders | 0, assists: d.assists | 0,
+      charters: d.charters || [], chartersDone: d.chartersDone | 0,
+    });
+    (d.anglers || []).forEach((s, i) => {
+      const a = game.anglers[i];
+      if (!a) return;
+      Object.assign(a, {
+        rod: s.rod | 0, reel: s.reel | 0, lure: s.lure | 0,
+        owned: s.owned || a.owned, xp: s.xp | 0, level: s.level || 1,
+        caught: s.caught | 0, lost: s.lost | 0, heaviest: s.heaviest || 0,
+      });
+    });
+  } catch (_) { /* corrupt save - start fresh rather than blow up */ }
+}
+
+let resetArmed = 0;
+
+function resetGame() {
+  const now = performance.now();
+  if (now - resetArmed > 4000) {
+    resetArmed = now;
+    logLine(game, 'Press SHIFT+R again to wipe the save and start a new season.', 'bad');
+    return;
+  }
+  resetArmed = 0;
+  try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+  game = newGame();
+  seedAmbient(game);
+  initCharters(game);
+  logLine(game, 'A fresh season. The cane poles are back in the boat.', 'info');
+}
+
+/* --------------------------------------------------------------- */
+/* Loop                                                             */
+/* --------------------------------------------------------------- */
+const canvas = document.getElementById('lake');
+const ctx = canvas.getContext('2d');
+const el = {
+  top:     document.getElementById('topbar'),
+  hud:    [document.getElementById('hud0'), document.getElementById('hud1')],
+  shop:   [document.getElementById('shop0'), document.getElementById('shop1')],
+  log:     document.getElementById('log'),
+  records: document.getElementById('records'),
+  charters: document.getElementById('charters'),
+};
+
+function fit() {
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', fit);
+
+let last = performance.now(), saveTimer = 0;
+
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  dt = Math.min(0.05, dt);          // a long tab-out must not teleport the sim
+  game.time += dt;
+
+  for (let i = 0; i < 2; i++) {
+    const a = game.anglers[i], shop = shops[i], input = readInput(i);
+    const partner = game.anglers[1 - i];
+
+    if (shop.flashT > 0) shop.flashT -= dt;
+
+    // The shop is only reachable with a slack line.
+    const busy = a.phase === PHASE.FIGHT || a.phase === PHASE.BITE || a.phase === PHASE.AIMING;
+    if (input.shopPressed && (!busy || shop.open)) shop.open = !shop.open;
+
+    if (shop.open) {
+      const rows = shopRows(game, a, shop.tab);
+      if (input.upPressed)   shop.index = (shop.index - 1 + rows.length) % rows.length;
+      if (input.downPressed) shop.index = (shop.index + 1) % rows.length;
+      if (input.tabPressed)  { shop.tab = (shop.tab + 1) % TABS.length; shop.index = 0; }
+      if (input.actionPressed) shopConfirm(game, a, shop);
+    } else {
+      // Quick lure swap from the boat without opening the shop.
+      if (input.tabPressed && a.phase === PHASE.IDLE) cycleLure(a);
+      const before = a.phase;
+      stepAngler(game, a, dt, input, partner);
+      if (before === PHASE.FIGHT && a.phase === PHASE.RESULT && a.result && !a.result.ok) window.blip('snap');
+      if (before === PHASE.AIMING && a.phase === PHASE.SINKING) {
+        addRipple(canvas.getBoundingClientRect().width * LANE[i], 0);
+      }
+    }
+  }
+
+  updateAmbient(dt);
+
+  const r = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+  draw(ctx, r.width, r.height, game, game.time);
+
+  renderTopBar(el.top, game);
+  for (let i = 0; i < 2; i++) {
+    renderHud(el.hud[i], game, game.anglers[i], i);
+    renderShop(el.shop[i], game, game.anglers[i], shops[i], KEYS[i].label);
+  }
+  renderLog(el.log, game);
+  renderCharters(el.charters, game);
+  const chc = document.getElementById('chcount');
+  if (chc) chc.textContent = game.chartersDone ? `${game.chartersDone} done` : '';
+  renderRecords(el.records, game);
+
+  saveTimer += dt;
+  if (saveTimer > 5) { saveTimer = 0; save(); }
+
+  pressed.clear();
+  requestAnimationFrame(frame);
+}
+
+/* Cycle only through lures the angler actually owns. */
+function cycleLure(a) {
+  const ownedIdx = LURES.map((l, i) => i).filter(i => a.owned.lures.includes(LURES[i].id));
+  if (ownedIdx.length < 2) return;
+  const at = ownedIdx.indexOf(a.lure);
+  a.lure = ownedIdx[(at + 1) % ownedIdx.length];
+}
+
+/* --------------------------------------------------------------- */
+load();
+fit();
+seedAmbient(game);
+if (!game.charters || !game.charters.length) initCharters(game);
+if (!game.log.length) {
+  logLine(game, 'Morning on the lake. Two rods, one boat, one wallet.', 'info');
+}
+addEventListener('beforeunload', save);
+requestAnimationFrame(frame);
+</script>

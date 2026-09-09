@@ -7,7 +7,16 @@ Two anglers share one boat, one lake and one wallet. You work your way from
 bluegill in the lily pads down to sturgeon in the Trench by upgrading rods,
 reels and lures.
 
-## Running it
+## Play it now
+
+The whole game is published as a single page here:
+**https://claude.ai/code/artifact/63112358-8e65-4b59-8220-67bd93fc8f50**
+
+That page is built from this repo by `node tools/build-artifact.js`, which
+inlines every script into `dist/deep-water-duo.html`. Rebuild and republish
+after changing anything under `src/`.
+
+## Running it locally
 
 Double-click `index.html`, or open it in your browser:
 
@@ -125,6 +134,7 @@ src/charters.js the shared charter board
 src/render.js   canvas drawing of the lake
 src/ui.js       HUD, shop and travel menu
 src/main.js     input, main loop, save/load
+tools/          build script that bundles everything into one page
 ```
 
 All balance numbers live in `src/data.js` and are commented. Change a rod's

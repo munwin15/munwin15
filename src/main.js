@@ -113,8 +113,16 @@ function load() {
   } catch (_) { /* corrupt save - start fresh rather than blow up */ }
 }
 
+let resetArmed = 0;
+
 function resetGame() {
-  if (!confirm('Wipe the boat log and start over?')) return;
+  const now = performance.now();
+  if (now - resetArmed > 4000) {
+    resetArmed = now;
+    logLine(game, 'Press SHIFT+R again to wipe the save and start a new season.', 'bad');
+    return;
+  }
+  resetArmed = 0;
   try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
   game = newGame();
   seedAmbient(game);
