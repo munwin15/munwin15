@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Water Duo — co-op freshwater fishing</title>
+<style>
+  :root {
+    --bg:      #060d14;
+    --panel:   #0d1a24;
+    --panel2:  #112532;
+    --edge:    #1d3646;
+    --text:    #d7e6f0;
+    --dim:     #7f9aad;
+    --p1:      #5fc9f0;
+    --p2:      #ffb35c;
+    --good:    #5ddc8a;
+    --warn:    #ffd166;
+    --bad:     #ff5c4d;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app {
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  /* ---------- top bar ---------- */
+  #topbar {
+    display: flex; align-items: center; gap: 20px;
+    background: linear-gradient(180deg, #16303f, #0e1f2b);
+    border: 1px solid var(--edge); border-radius: 8px;
+    padding: 8px 14px;
+  }
+  #topbar .cash { font-size: 22px; font-weight: 700; color: var(--good);
+                  font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #topbar .spot { font-size: 16px; font-weight: 600; }
+  #topbar .spot em { color: var(--dim); font-style: normal; font-weight: 400; font-size: 13px; }
+  #topbar .tally { margin-left: auto; color: var(--dim); font-size: 12px; }
+
+  /* ---------- middle ---------- */
+  #middle {
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 8px;
+    min-height: 0;
+  }
+  #stage { position: relative; min-width: 0; min-height: 0; }
+  #lake {
+    width: 100%; height: 100%; display: block;
+    border: 1px solid var(--edge); border-radius: 8px;
+    background: #02141f;
+  }
+
+  /* ---------- hud ---------- */
+  .hud {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 9px 12px; display: flex; flex-direction: column; gap: 6px;
+    overflow: hidden; min-height: 0;
+  }
+  .hud-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .pname { font-size: 16px; font-weight: 700; }
+  .pname.p0 { color: var(--p1); }
+  .pname.p1 { color: var(--p2); }
+  .rank { font-size: 11px; color: var(--dim); }
+  .status {
+    background: var(--panel2); border-radius: 5px; padding: 6px 8px;
+    font-size: 12px; color: var(--dim); text-align: center;
+  }
+  .status.alert { background: #45150f; color: #ff8f85; font-weight: 700; animation: pulse .45s infinite alternate; }
+  .status.fight { background: #3d3410; color: var(--warn); font-weight: 600; }
+  @keyframes pulse { to { opacity: .55; } }
+
+  .gear div { font-size: 12px; padding: 3px 0; border-bottom: 1px solid #162b39; }
+  .gl { display: inline-block; width: 38px; color: var(--dim); font-size: 10px; letter-spacing: .06em; }
+  .gs { color: var(--dim); font-size: 11px; float: right;
+        font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .barlabel { font-size: 10px; color: var(--dim); letter-spacing: .06em;
+              text-transform: uppercase; margin-top: 4px; }
+  .bar { position: relative; height: 9px; background: #162b39; border-radius: 5px; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 5px;
+           transition: width .05s linear; }
+  .bar i.ok { background: var(--good); }
+  .bar i.warn { background: var(--warn); }
+  .bar i.danger { background: var(--bad); }
+  .bar i.stam { background: #7aa7c7; }
+  .bar u { position: absolute; top: 0; width: 2px; height: 100%; background: rgba(255,255,255,.6); }
+
+  .stats { font-size: 11px; color: var(--dim); margin-top: auto; line-height: 1.6; flex: none; }
+  .stats b { color: var(--text); }
+
+  .biting { margin-top: 6px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .biting h4 {
+    margin: 0 0 5px; font-size: 10px; letter-spacing: .08em;
+    color: var(--dim); text-transform: uppercase; font-weight: 600;
+  }
+  .bt { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 1.5px 0; }
+  .bt .sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .bt .bn { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bt .bb { width: 46px; height: 5px; background: #162b39; border-radius: 3px; flex: none; }
+  .bt .bb i { display: block; height: 100%; border-radius: 3px; background: var(--good); }
+  .biting .none { font-size: 11px; color: #5b7183; font-style: italic; }
+
+  /* ---------- shop overlay ---------- */
+  .shop {
+    display: none; position: absolute; top: 10px; width: 340px; max-height: calc(100% - 20px);
+    background: rgba(8,20,28,.97); border: 1px solid #2b5570; border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    padding: 10px; overflow: hidden; z-index: 5;
+  }
+  #shop0 { left: 10px; }
+  #shop1 { right: 10px; }
+  .shop-head { font-size: 13px; padding-bottom: 8px; border-bottom: 1px solid var(--edge); }
+  .tabs { display: block; margin-top: 8px; }
+  .tab { font-size: 10px; letter-spacing: .08em; color: var(--dim);
+         padding: 3px 7px; border-radius: 4px; margin-right: 3px; background: #12242f; }
+  .tab.on { background: var(--p1); color: #04131c; font-weight: 700; }
+  .shop-list { margin: 8px 0; max-height: 300px; overflow: auto; }
+  .row { display: flex; justify-content: space-between; gap: 8px;
+         padding: 5px 7px; border-radius: 4px; font-size: 12px; }
+  .row.sel { background: #1d4055; outline: 1px solid #47829f; }
+  .row.equipped .nm, .row.here .nm { color: var(--good); font-weight: 600; }
+  .row.owned .nm { color: var(--text); }
+  .row.poor .nm, .row.locked .nm { color: #5b7183; }
+  .row.poor .rt, .row.locked .rt { color: var(--bad); }
+  .row .rt { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--dim); }
+  .row.buy .rt, .row.go .rt { color: var(--warn); }
+  .shop-detail { border-top: 1px solid var(--edge); padding-top: 8px; min-height: 62px; }
+  .dnote { font-size: 11px; color: var(--p1); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .dblurb { font-size: 11px; color: var(--dim); font-style: italic; margin-top: 4px; }
+  .dflash { font-size: 11px; color: var(--warn); margin-top: 5px; font-weight: 600; }
+  .shop-keys { font-size: 10px; color: #5b7183; border-top: 1px solid var(--edge);
+               margin-top: 6px; padding-top: 6px; }
+
+  /* ---------- bottom ---------- */
+  #bottom { display: grid; grid-template-columns: 1fr 340px; gap: 8px; height: 124px; min-height: 0; }
+  #log, #recwrap {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
+    padding: 8px 12px; overflow: auto; font-size: 12px;
+  }
+  #log .l { padding: 1px 0; color: var(--dim); }
+  #log .l.good { color: var(--good); }
+  #log .l.bad { color: #e08a80; }
+  #log .l.record { color: var(--warn); font-weight: 700; }
+  #recwrap h3 { margin: 0 0 5px; font-size: 11px; letter-spacing: .1em;
+                color: var(--dim); text-transform: uppercase; }
+  .rec { display: flex; gap: 8px; font-size: 11px; padding: 1px 0; }
+  .rec .rn { flex: 1; }
+  .rec .rw { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--warn); }
+  .rec .rb { color: var(--dim); width: 62px; text-align: right; }
+  .empty { color: #5b7183; font-size: 11px; font-style: italic; }
+
+  /* ---------- splash ---------- */
+  #splash {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    background: rgba(3,10,16,.94); padding: 20px;
+  }
+  #splash .card {
+    max-width: 780px; background: var(--panel); border: 1px solid #2b5570;
+    border-radius: 12px; padding: 26px 32px;
+  }
+  #splash h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  #splash h1 span { color: var(--p1); }
+  #splash .tag { color: var(--dim); margin-bottom: 18px; }
+  .ctrls { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 16px; }
+  .ctrls section { background: var(--panel2); border-radius: 8px; padding: 12px 14px; }
+  .ctrls h2 { margin: 0 0 8px; font-size: 14px; }
+  .ctrls .k { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+  .ctrls kbd {
+    background: #1e3d50; border: 1px solid #35617c; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 6px; font-size: 11px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .tips { font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .tips b { color: var(--text); }
+  .go { margin-top: 16px; text-align: center; color: var(--warn); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar"></div>
+
+  <div id="middle">
+    <div class="hud" id="hud0"></div>
+    <div id="stage">
+      <canvas id="lake"></canvas>
+      <div class="shop" id="shop0"></div>
+      <div class="shop" id="shop1"></div>
+    </div>
+    <div class="hud" id="hud1"></div>
+  </div>
+
+  <div id="bottom">
+    <div id="log"></div>
+    <div id="recwrap">
+      <h3>Lake record book</h3>
+      <div id="records"></div>
+    </div>
+  </div>
+</div>
+
+<div id="splash">
+  <div class="card">
+    <h1>Deep <span>Water</span> Duo</h1>
+    <div class="tag">Two anglers, one boat, one shared wallet. Fish deeper, catch bigger.</div>
+
+    <div class="ctrls">
+      <section>
+        <h2 style="color:#5fc9f0">Player 1</h2>
+        <div class="k"><span>Cast / hookset / reel</span><kbd>SPACE</kbd></div>
+        <div class="k"><span>Let line out (sink)</span><kbd>S</kbd></div>
+        <div class="k"><span>Reel up</span><kbd>W</kbd></div>
+        <div class="k"><span>Swap lure / shop tab</span><kbd>Q</kbd></div>
+        <div class="k"><span>Shop &amp; travel</span><kbd>E</kbd></div>
+      </section>
+      <section>
+        <h2 style="color:#ffb35c">Player 2</h2>
+        <div class="k"><span>Cast / hookset / reel</span><kbd>ENTER</kbd></div>
+        <div class="k"><span>Let line out (sink)</span><kbd>&#8595;</kbd></div>
+        <div class="k"><span>Reel up</span><kbd>&#8593;</kbd></div>
+        <div class="k"><span>Swap lure / shop tab</span><kbd>/</kbd></div>
+        <div class="k"><span>Shop &amp; travel</span><kbd>RIGHT SHIFT</kbd></div>
+      </section>
+    </div>
+
+    <div class="tips">
+      <b>Cast</b> by holding your action key and releasing at the power you want.
+      <b>Sink</b> to the depth the fish are holding at, then <b>tap</b> your action key to work the
+      lure — that jigging action is what draws a strike.<br>
+      When you see <b>!</b>, tap again fast to set the hook. In the fight, <b>hold</b> to reel:
+      it gains line but loads the rod. Let go and the drag gives it back. Cross the red mark for
+      too long and the line snaps.<br>
+      <b>Co-op:</b> when your partner is hooked up and your line is in the boat, hold your action key
+      to work the net — it bleeds off their tension and pays you both. Land two fish at once for a
+      <b>double header</b> bonus.<br>
+      <b>Progress:</b> rods carry heavier fish, reels hold more line and unlock deeper spots, lures
+      decide which species even look at you. Money is shared, so plan the upgrades together.
+    </div>
+
+    <div class="go">Press any key to shove off &nbsp;·&nbsp; SHIFT+R wipes the save</div>
+  </div>
+</div>
+
+<script src="src/data.js"></script>
+<script src="src/game.js"></script>
+<script src="src/render.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
