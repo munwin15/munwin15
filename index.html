@@ -78,6 +78,10 @@
   .status.alert { background: #45150f; color: #ff8f85; font-weight: 700; animation: pulse .45s infinite alternate; }
   .status.fight { background: #3d3410; color: var(--warn); font-weight: 600; }
   @keyframes pulse { to { opacity: .55; } }
+  .tell {
+    font-size: 11px; color: var(--warn); text-align: center;
+    font-style: italic; margin-top: -2px;
+  }
 
   .gear div { font-size: 12px; padding: 3px 0; border-bottom: 1px solid #162b39; }
   .gl { display: inline-block; width: 38px; color: var(--dim); font-size: 10px; letter-spacing: .06em; }
@@ -95,6 +99,7 @@
   .bar i.stam { background: #7aa7c7; }
   .bar u { position: absolute; top: 0; width: 2px; height: 100%; background: rgba(255,255,255,.6); }
 
+  .barlabel .fray { color: var(--bad); animation: pulse .4s infinite alternate; }
   .stats { font-size: 11px; color: var(--dim); margin-top: auto; line-height: 1.6; flex: none; }
   .stats b { color: var(--text); }
 
@@ -132,6 +137,8 @@
   .row.owned .nm { color: var(--text); }
   .row.poor .nm, .row.locked .nm { color: #5b7183; }
   .row.poor .rt, .row.locked .rt { color: var(--bad); }
+  .row.register .rt { color: var(--dim); }
+  .row.register.owned .rt { color: var(--warn); font-weight: 600; }
   .row .rt { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--dim); }
   .row.buy .rt, .row.go .rt { color: var(--warn); }
   .shop-detail { border-top: 1px solid var(--edge); padding-top: 8px; min-height: 62px; }
@@ -142,8 +149,8 @@
                margin-top: 6px; padding-top: 6px; }
 
   /* ---------- bottom ---------- */
-  #bottom { display: grid; grid-template-columns: 1fr 340px; gap: 8px; height: 124px; min-height: 0; }
-  #log, #recwrap {
+  #bottom { display: grid; grid-template-columns: 1fr 300px 300px; gap: 8px; height: 124px; min-height: 0; }
+  #log, #recwrap, #chwrap {
     background: var(--panel); border: 1px solid var(--edge); border-radius: 8px;
     padding: 8px 12px; overflow: auto; font-size: 12px;
   }
@@ -151,8 +158,17 @@
   #log .l.good { color: var(--good); }
   #log .l.bad { color: #e08a80; }
   #log .l.record { color: var(--warn); font-weight: 700; }
-  #recwrap h3 { margin: 0 0 5px; font-size: 11px; letter-spacing: .1em;
+  #recwrap h3, #chwrap h3 { margin: 0 0 5px; font-size: 11px; letter-spacing: .1em;
                 color: var(--dim); text-transform: uppercase; }
+  #reccount, #chcount { color: var(--warn); }
+  .ch { margin-bottom: 7px; }
+  .ch:last-child { margin-bottom: 0; }
+  .chtop { display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
+  .cht { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chr { color: var(--good); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .chbar { height: 4px; background: #162b39; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .chbar i { display: block; height: 100%; background: var(--warn); border-radius: 3px; }
+  .chp { font-size: 10px; color: var(--dim); font-family: ui-monospace, Menlo, Consolas, monospace; }
   .rec { display: flex; gap: 8px; font-size: 11px; padding: 1px 0; }
   .rec .rn { flex: 1; }
   .rec .rw { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--warn); }
@@ -201,8 +217,12 @@
 
   <div id="bottom">
     <div id="log"></div>
+    <div id="chwrap">
+      <h3>Charter board <span id="chcount"></span></h3>
+      <div id="charters"></div>
+    </div>
     <div id="recwrap">
-      <h3>Lake record book</h3>
+      <h3>Lake record book <span id="reccount"></span></h3>
       <div id="records"></div>
     </div>
   </div>
@@ -237,13 +257,16 @@
       <b>Sink</b> to the depth the fish are holding at, then <b>tap</b> your action key to work the
       lure — that jigging action is what draws a strike.<br>
       When you see <b>!</b>, tap again fast to set the hook. In the fight, <b>hold</b> to reel:
-      it gains line but loads the rod. Let go and the drag gives it back. Cross the red mark for
-      too long and the line snaps.<br>
+      it gains line but loads the rod. Let go and the drag gives it back. Push past the white
+      mark and the line starts <b>fraying</b> — that damage never heals, so muscle a fish for
+      long enough and it will part. Pump and wind instead.<br>
       <b>Co-op:</b> when your partner is hooked up and your line is in the boat, hold your action key
       to work the net — it bleeds off their tension and pays you both. Land two fish at once for a
       <b>double header</b> bonus.<br>
       <b>Progress:</b> rods carry heavier fish, reels hold more line and unlock deeper spots, lures
       decide which species even look at you. Money is shared, so plan the upgrades together.
+      Every species fights differently: pike run, catfish sulk, bass jump. Your panel tells you
+      which you have on.
     </div>
 
     <div class="go">Press any key to shove off &nbsp;·&nbsp; SHIFT+R wipes the save</div>
@@ -252,6 +275,7 @@
 
 <script src="src/data.js"></script>
 <script src="src/game.js"></script>
+<script src="src/charters.js"></script>
 <script src="src/render.js"></script>
 <script src="src/ui.js"></script>
 <script src="src/main.js"></script>

@@ -2,6 +2,9 @@
    Deep Water Duo - game state and simulation
    ===================================================================== */
 
+/* Past this much of the rod's rating the line starts taking damage. */
+const SAFE_TENSION = 0.82;
+
 const PHASE = {
   IDLE:    'idle',     // on the boat, nothing in the water
   AIMING:  'aiming',   // holding the action key, power meter swinging
@@ -24,7 +27,7 @@ function makeAngler(index, name) {
     lastJig: 0,
     biteTimer: 0, biteWindow: 0,
     fish: null,
-    tension: 0, overload: 0,
+    tension: 0, wear: 0,
     resultTimer: 0, result: null,
     assisting: false,                  // helping the partner land theirs
     hadAssist: false, hadPartnerOn: false,  // co-op bonuses latched per fight
@@ -41,6 +44,8 @@ function newGame() {
     anglers: [makeAngler(0, 'Player 1'), makeAngler(1, 'Player 2')],
     records: {},        // speciesId -> { weight, length, by, spot }
     log: [],
+    charters: [],
+    chartersDone: 0,
     totalCaught: 0,
     totalEarned: 0,
     doubleHeaders: 0,
@@ -110,8 +115,11 @@ function biteRate(game, a, sp, atDepth) {
   // Working the rod is what triggers the strike.
   const actionMul = 0.35 + a.action * lure.action * 1.3;
 
-  const rarity = sp.rarity / 100;
-  return 0.085 * rarity * sizeFit * lureFit * bandFit * depthFit * actionMul;
+  // Compressed rather than linear: at face value the rarity spread made the
+  // deep spots crawl, since everything down there is rare by design. This
+  // keeps trophies uncommon without leaving two players staring at a rod.
+  const rarity = Math.pow(sp.rarity / 100, 0.6);
+  return 0.055 * rarity * sizeFit * lureFit * bandFit * depthFit * actionMul;
 }
 
 function candidateBites(game, a) {
@@ -169,6 +177,31 @@ function makeFish(sp, a) {
   };
 }
 
+/* ---------------------------------------------------------------
+   FIGHT STYLES
+   Every species pulls the same average weight for its size, but how it
+   delivers that pull is what makes it feel different in the hand.
+   chance   : odds of starting a surge when the timer comes up
+   mag      : how hard a surge hits on top of the base pull
+   gap      : seconds between surge rolls, [min, max]
+   decay    : how fast a surge bleeds off. Low means long, grinding runs.
+   drain    : endurance multiplier. Low means it never gives up.
+   --------------------------------------------------------------- */
+const FIGHT_STYLES = {
+  steady:  { chance: 0.35, mag: 0.40, gap: [1.0, 2.6], decay: 0.60, drain: 1.00,
+             tell: 'steady, honest pulls' },
+  jumper:  { chance: 0.62, mag: 0.80, gap: [0.4, 1.3], decay: 0.95, drain: 1.30,
+             tell: 'sharp and erratic - it will jump' },
+  runner:  { chance: 0.55, mag: 1.05, gap: [0.7, 2.0], decay: 0.32, drain: 1.15,
+             tell: 'long hard runs - give it line' },
+  bulldog: { chance: 0.24, mag: 0.45, gap: [1.6, 3.4], decay: 0.40, drain: 0.62,
+             tell: 'sulking deep - it will not quit' },
+  deep:    { chance: 0.40, mag: 0.68, gap: [1.2, 3.0], decay: 0.42, drain: 0.82,
+             tell: 'slow and heavy - it keeps diving' },
+};
+
+function styleOf(sp) { return FIGHT_STYLES[sp.fight] || FIGHT_STYLES.steady; }
+
 /* Pounds of pull the fish is putting on the rod right now. */
 function fishPull(f) {
   const fatigue = 0.3 + 0.7 * (f.stamina / f.maxStamina);
@@ -183,15 +216,18 @@ function stepFight(game, a, dt, input, partner) {
   const f = a.fish;
   const rod = rodOf(a), reel = reelOf(a);
 
+  const style = styleOf(f.sp);
   f.phase += dt * 3.2;
   f.surgeTimer -= dt;
   if (f.surgeTimer <= 0) {
     // A fresh fish makes hard runs. A tired one mostly sulks.
     const energy = f.stamina / f.maxStamina;
-    f.surge = Math.random() < 0.45 * energy + 0.1 ? 0.35 + Math.random() * 0.55 * energy : 0;
-    f.surgeTimer = 0.8 + Math.random() * 2.2;
+    f.surge = Math.random() < style.chance * energy + 0.08
+      ? style.mag * (0.45 + Math.random() * 0.55) * energy
+      : 0;
+    f.surgeTimer = style.gap[0] + Math.random() * (style.gap[1] - style.gap[0]);
   }
-  f.surge = Math.max(0, f.surge - dt * 0.55);
+  f.surge = Math.max(0, f.surge - dt * style.decay);
 
   const reeling = input.action;
   // A partner with nothing in the water can grab the net and take some
@@ -209,7 +245,7 @@ function stepFight(game, a, dt, input, partner) {
 
   // Drag smooths the climb and gives it back when you stop cranking.
   const riseRate = (2.4 - reel.drag) * (assisted ? 0.6 : 1);
-  const fallRate = 0.55 + reel.drag * 1.4;
+  const fallRate = 0.45 + reel.drag * 0.95;
   if (target > a.tension) a.tension = Math.min(target, a.tension + riseRate * dt);
   else a.tension = Math.max(target, a.tension - fallRate * dt);
 
@@ -220,15 +256,18 @@ function stepFight(game, a, dt, input, partner) {
   f.distance = Math.min(f.distance, a.castDist + a.depth + 40);
 
   // Fish tires from fighting the drag, plus a little just from swimming.
-  const drain = (3.2 + a.tension * (reeling ? 20 : 9)) * (assisted ? 1.2 : 1);
+  const drain = (3.2 + a.tension * (reeling ? 20 : 9)) * (assisted ? 1.2 : 1) * style.drain;
   f.stamina = Math.max(0, f.stamina - drain * dt);
 
-  // Too much tension for too long and the line lets go.
-  if (a.tension >= 1) {
-    a.overload += dt;
-    if (a.overload > 0.85) { breakOff(game, a, partner, assisted); return; }
-  } else {
-    a.overload = Math.max(0, a.overload - dt * 1.6);
+  // Line damage is cumulative and permanent for the rest of the fight.
+  // Nursing a fish just under the safe mark costs you nothing; muscling it
+  // frays the line a little at a time until something gives. This is what
+  // makes pumping and winding the right answer instead of just holding on.
+  if (a.tension > SAFE_TENSION) {
+    const over = (a.tension - SAFE_TENSION) / (1 - SAFE_TENSION);
+    const guard = 1.25 - reel.drag * 0.5;      // a good drag saves your line
+    a.wear += over * over * 4.0 * guard * (assisted ? 0.7 : 1) * dt;
+    if (a.wear >= 1) { breakOff(game, a, partner, assisted); return; }
   }
 
   if (f.distance <= 0) land(game, a, partner, assisted);
@@ -239,10 +278,17 @@ function breakOff(game, a, partner, assisted) {
   a.phase = PHASE.RESULT;
   a.result = { ok: false, fish: f, text: 'LINE SNAPPED', sub: `${f.sp.name}, about ${f.weight.toFixed(1)} lb` };
   a.resultTimer = 2.6;
-  a.lost++; a.streak = 0; a.tension = 0; a.overload = 0; a.fish = null;
+  a.lost++; a.streak = 0; a.tension = 0; a.wear = 0; a.fish = null;
   a.hadAssist = false; a.hadPartnerOn = false;
   if (partner) partner.assisting = false;
   logLine(game, `${a.name} lost a ${f.weight.toFixed(1)} lb ${f.sp.name} - line snapped.`, 'bad');
+}
+
+/* What a fish is worth at the dock, before any crew bonuses. Charter
+   rewards are priced off this so the board can never out-earn fishing. */
+function dockValue(sp, weight) {
+  const scarcity = sp.rarity < 10 ? 1.6 : sp.rarity < 25 ? 1.25 : 1;
+  return weight * sp.ppl * scarcity;
 }
 
 function land(game, a, partner, assisted) {
@@ -260,9 +306,7 @@ function land(game, a, partner, assisted) {
   // Records pay a bounty, so chasing a personal best is worth it.
   const prev = game.records[sp.id];
   const isRecord = !prev || f.weight > prev.weight;
-  // Hard-to-find fish carry a scarcity premium on top of their price per pound.
-  const scarcity = sp.rarity < 10 ? 1.6 : sp.rarity < 25 ? 1.25 : 1;
-  const base = f.weight * sp.ppl * scarcity;
+  const base = dockValue(sp, f.weight);
   const value = Math.round(base * mult * (isRecord ? 1.5 : 1)) + 10;
 
   game.cash += value;
@@ -290,8 +334,13 @@ function land(game, a, partner, assisted) {
     sub: `${sp.name} - ${f.weight.toFixed(1)} lb, ${f.length.toFixed(0)} in`,
   };
   a.resultTimer = 3.0;
-  a.tension = 0; a.overload = 0; a.fish = null;
+  a.tension = 0; a.wear = 0; a.fish = null;
   a.hadAssist = false; a.hadPartnerOn = false;
+
+  // The charter board reads every fish that reaches the boat.
+  if (typeof checkCharters === 'function') {
+    checkCharters(game, a, f, { doubleHeader, netted, value });
+  }
 
   let msg = `${a.name} landed a ${f.weight.toFixed(1)} lb ${sp.name} (+$${value})`;
   if (isRecord) msg += ' - lake record!';
@@ -361,7 +410,7 @@ function stepAngler(game, a, dt, input, partner) {
     case PHASE.BITE: {
       a.biteTimer -= dt;
       if (input.actionPressed) {
-        a.phase = PHASE.FIGHT; a.tension = 0.25; a.overload = 0;
+        a.phase = PHASE.FIGHT; a.tension = 0.25; a.wear = 0;
         a.hadAssist = false; a.hadPartnerOn = false;
         if (window.blip) window.blip('hookup');
       } else if (a.biteTimer <= 0) {

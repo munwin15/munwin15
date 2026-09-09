@@ -401,21 +401,30 @@ function drawFightGauge(ctx, x, y, a, col) {
 
   // Tension bar - the thing that will cost you the fish.
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, 24);
+  ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, 27);
   ctx.fillStyle = 'rgba(255,255,255,0.14)';
   ctx.fillRect(x - w / 2, y, w, 8);
   const tc = a.tension > 0.82 ? '#ff5c4d' : a.tension > 0.6 ? '#ffd166' : '#5ddc8a';
   ctx.fillStyle = tc;
   ctx.fillRect(x - w / 2, y, w * Math.min(1, a.tension), 8);
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillRect(x - w / 2 + w * 0.82, y - 2, 1.5, 12);
+  ctx.fillRect(x - w / 2 + w * SAFE_TENSION, y - 2, 1.5, 12);
+
+  // Line wear: damage already done, and it does not heal.
+  const wear = Math.min(1, a.wear || 0);
+  if (wear > 0.01) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(x - w / 2, y + 9, w, 4);
+    ctx.fillStyle = wear > 0.66 ? '#ff5c4d' : '#ffd166';
+    ctx.fillRect(x - w / 2, y + 9, w * wear, 4);
+  }
 
   // Remaining line to the boat.
   const prog = 1 - Math.min(1, f.distance / Math.max(1, f.startDistance));
   ctx.fillStyle = 'rgba(255,255,255,0.14)';
-  ctx.fillRect(x - w / 2, y + 12, w, 6);
+  ctx.fillRect(x - w / 2, y + 15, w, 6);
   ctx.fillStyle = col;
-  ctx.fillRect(x - w / 2, y + 12, w * prog, 6);
+  ctx.fillRect(x - w / 2, y + 15, w * prog, 6);
 
   ctx.font = 'bold 10px ui-monospace, monospace';
   ctx.fillStyle = '#e8f4ff';

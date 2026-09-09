@@ -4,9 +4,9 @@
    each with their own keys, without fighting over a mouse.
    ===================================================================== */
 
-const TABS = ['RODS', 'REELS', 'LURES', 'TRAVEL'];
+const TABS = ['RODS', 'REELS', 'LURES', 'TRAVEL', 'REGISTER'];
 
-function makeShopState() { return { open: false, tab: 0, index: 0, flash: '', flashT: 0 }; }
+function makeShopState() { return { open: false, tab: 0, index: 0, flash: '', flashT: 0, lastHtml: null }; }
 
 /* What is listed under the current tab for this angler. */
 function shopRows(game, a, tab) {
@@ -14,6 +14,7 @@ function shopRows(game, a, tab) {
     case 'RODS':  return RODS.map((r, i)  => rowGear(game, a, r, i, 'rods',  a.rod));
     case 'REELS': return REELS.map((r, i) => rowGear(game, a, r, i, 'reels', a.reel));
     case 'LURES': return LURES.map((r, i) => rowGear(game, a, r, i, 'lures', a.lure));
+    case 'REGISTER': return SPECIES.map((sp, i) => rowSpecies(game, a, sp, i));
     case 'TRAVEL':return SPOTS.map((s, i) => {
       const reachable = canTravel(game, i);
       const here = game.spot === i;
@@ -28,6 +29,32 @@ function shopRows(game, a, tab) {
     });
   }
   return [];
+}
+
+function rowSpecies(game, a, sp, i) {
+  const rec = game.records[sp.id];
+  const spot = SPOTS[game.spot];
+  const lure = lureOf(a);
+  const reach = reelOf(a).maxDepth;
+
+  // Say the first concrete reason this fish is out of reach right now.
+  let why;
+  if (sp.min > spot.bottom)      why = `not in this water - needs ${sp.min} ft or deeper`;
+  else if (sp.min > reach)       why = `below your line - needs a ${sp.min} ft reel`;
+  else if (lure.size < sp.minLure) why = `ignores this lure - needs size ${sp.minLure} or bigger`;
+  else if (!lure.tags.some(t => sp.tags.includes(t))) why = 'will only nip at this lure';
+  else if (sp.min > lure.max || sp.max < lure.min) why = 'holds outside this lure\'s depth band';
+  else                           why = `catchable right now at ${sp.min}-${Math.min(sp.max, reach)} ft`;
+
+  return {
+    id: sp.id, name: sp.name, price: 0, obj: sp, kind: 'register', idx: i,
+    state: rec ? 'owned' : 'locked',
+    note: `${sp.min}-${sp.max} ft · lure size ${sp.minLure}+ · ${sp.tags.join(', ')} · $${sp.ppl}/lb`,
+    blurb: rec
+      ? `Record: ${rec.weight.toFixed(1)} lb, ${rec.length.toFixed(0)} in by ${rec.by} at ${rec.spot}. Fights ${styleOf(sp).tell}.`
+      : why.charAt(0).toUpperCase() + why.slice(1) + '.',
+    right: rec ? `${rec.weight.toFixed(1)} lb` : '—',
+  };
 }
 
 function rowGear(game, a, item, i, bucket, equippedIdx) {
@@ -52,6 +79,11 @@ function shopConfirm(game, a, shop) {
   const rows = shopRows(game, a, shop.tab);
   const row = rows[shop.index];
   if (!row) return;
+
+  if (row.kind === 'register') {
+    const n = Object.keys(game.records).length;
+    return flash(shop, `${n} of ${SPECIES.length} species in the book.`);
+  }
 
   if (row.kind === 'travel') {
     if (row.state === 'locked') return flash(shop, 'You need a bigger reel to reach that water.');
@@ -89,7 +121,7 @@ function flash(shop, msg) { shop.flash = msg; shop.flashT = 2.2; }
 /* Rendering the shop panel                                         */
 /* --------------------------------------------------------------- */
 function renderShop(el, game, a, shop, keys) {
-  if (!shop.open) { el.style.display = 'none'; return; }
+  if (!shop.open) { el.style.display = 'none'; shop.lastHtml = null; return; }
   el.style.display = 'block';
   const rows = shopRows(game, a, shop.tab);
   shop.index = Math.max(0, Math.min(rows.length - 1, shop.index));
@@ -99,9 +131,11 @@ function renderShop(el, game, a, shop, keys) {
     `<span class="tab ${i === shop.tab ? 'on' : ''}">${t}</span>`).join('');
 
   const list = rows.map((r, i) => {
-    const cls = ['row', i === shop.index ? 'sel' : '', r.state].join(' ');
+    const cls = ['row', r.kind, i === shop.index ? 'sel' : '', r.state].join(' ');
     let right;
-    if (r.kind === 'travel') {
+    if (r.right !== undefined) {
+      right = r.right;
+    } else if (r.kind === 'travel') {
       right = r.state === 'here' ? 'HERE' : r.state === 'go' ? 'TRAVEL' : 'LOCKED';
     } else {
       right = r.state === 'equipped' ? 'EQUIPPED'
@@ -111,7 +145,7 @@ function renderShop(el, game, a, shop, keys) {
     return `<div class="${cls}"><span class="nm">${r.name}</span><span class="rt">${right}</span></div>`;
   }).join('');
 
-  el.innerHTML = `
+  const html = `
     <div class="shop-head">
       <b>${a.name}</b> · ${rankName(a.level)} lvl ${a.level}
       <span class="tabs">${tabs}</span>
@@ -124,6 +158,13 @@ function renderShop(el, game, a, shop, keys) {
     </div>
     <div class="shop-keys">${keys.up}/${keys.down} move · ${keys.tab} tab · ${keys.action} select · ${keys.shop} close</div>
   `;
+  if (html === shop.lastHtml) return;
+  shop.lastHtml = html;
+  el.innerHTML = html;
+
+  // Keep the highlighted row on screen - the register runs to 17 entries.
+  const selEl = el.querySelector('.row.sel');
+  if (selEl) selEl.scrollIntoView({ block: 'nearest' });
 }
 
 /* --------------------------------------------------------------- */
@@ -133,19 +174,22 @@ function renderHud(el, game, a, i) {
   const rod = RODS[a.rod], reel = REELS[a.reel], lure = LURES[a.lure];
   const maxD = maxDepthFor(game, a);
 
-  let status, statusCls = '';
+  let status, statusCls = '', tell = '';
   switch (a.phase) {
     case PHASE.IDLE:    status = a.assisting ? 'netting for partner' : 'ready to cast'; break;
     case PHASE.AIMING:  status = 'winding up...'; break;
     case PHASE.SINKING: status = `fishing at ${a.depth.toFixed(0)} ft`; break;
     case PHASE.BITE:    status = 'FISH ON IT - SET THE HOOK'; statusCls = 'alert'; break;
-    case PHASE.FIGHT:   status = `fighting a ${a.fish.sp.name}`; statusCls = 'fight'; break;
+    case PHASE.FIGHT:   status = `fighting a ${a.fish.sp.name}`; statusCls = 'fight';
+                        tell = styleOf(a.fish.sp).tell; break;
     case PHASE.RESULT:  status = a.result && a.result.ok ? 'boated it' : 'lost it'; break;
   }
 
   const tPct = Math.min(100, a.tension * 100);
-  const tCls = a.tension > 0.82 ? 'danger' : a.tension > 0.6 ? 'warn' : 'ok';
+  const tCls = a.tension > SAFE_TENSION ? 'danger' : a.tension > 0.6 ? 'warn' : 'ok';
   const stam = a.fish ? (a.fish.stamina / a.fish.maxStamina) * 100 : 0;
+  const wear = Math.min(100, (a.wear || 0) * 100);
+  const wCls = wear > 66 ? 'danger' : wear > 33 ? 'warn' : 'ok';
 
   el.innerHTML = `
     <div class="hud-top">
@@ -153,6 +197,7 @@ function renderHud(el, game, a, i) {
       <span class="rank">${rankName(a.level)} · lvl ${a.level}</span>
     </div>
     <div class="status ${statusCls}">${status}</div>
+    ${tell ? `<div class="tell">${tell}</div>` : ''}
     <div class="gear">
       <div><span class="gl">ROD</span> ${rod.name} <span class="gs">${rod.power} lb</span></div>
       <div><span class="gl">REEL</span> ${reel.name} <span class="gs">${reel.maxDepth} ft</span></div>
@@ -160,7 +205,10 @@ function renderHud(el, game, a, i) {
     </div>
     <div class="bars">
       <div class="barlabel">line tension</div>
-      <div class="bar"><i class="${tCls}" style="width:${tPct}%"></i><u style="left:82%"></u></div>
+      <div class="bar"><i class="${tCls}" style="width:${tPct}%"></i>
+        <u style="left:${SAFE_TENSION * 100}%"></u></div>
+      <div class="barlabel">line wear${wear > 60 ? ' <b class="fray">FRAYING</b>' : ''}</div>
+      <div class="bar"><i class="${wCls}" style="width:${wear}%"></i></div>
       <div class="barlabel">fish stamina</div>
       <div class="bar"><i class="stam" style="width:${stam}%"></i></div>
     </div>
@@ -215,7 +263,12 @@ function renderLog(el, game) {
 
 function renderRecords(el, game) {
   const ids = Object.keys(game.records);
-  if (!ids.length) { el.innerHTML = '<div class="empty">No records yet. Go catch something.</div>'; return; }
+  const count = document.getElementById('reccount');
+  if (count) count.textContent = `${ids.length} / ${SPECIES.length}`;
+  if (!ids.length) {
+    el.innerHTML = '<div class="empty">No records yet. Open the shop and tab to REGISTER to see what lives here.</div>';
+    return;
+  }
   el.innerHTML = ids
     .map(id => ({ id, r: game.records[id], sp: SPECIES.find(s => s.id === id) }))
     .sort((a, b) => b.r.weight - a.r.weight)

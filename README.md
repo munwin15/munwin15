@@ -52,9 +52,15 @@ Both players play on the same keyboard at the same time.
 4. **Set the hook.** When `!` flashes, tap again before the bar runs out. A
    more sensitive rod gives you a longer window.
 5. **Fight it.** Hold to reel. Cranking gains line but loads the rod, and the
-   tension bar climbs. Cross the white mark for too long and the line snaps.
-   Let go and the drag recovers while the fish tires itself out. Pump and
-   wind: reel when it is calm, give line when it runs.
+   tension bar climbs. Push past the white mark and the line starts fraying —
+   **that damage is permanent for the rest of the fight**, so muscling a fish
+   costs you a little line every second. Let go and the drag recovers while
+   the fish tires. Pump and wind: reel when it is calm, give line when it runs.
+
+Every species fights differently, and your panel names the style once you are
+hooked up. Bass jump and run erratically, pike and musky make long hard runs,
+catfish and sturgeon sulk deep and simply outlast you, lake trout keep diving.
+A bulldog fight can run four times longer than a panfish, so budget your line.
 
 ## Co-op
 
@@ -68,6 +74,10 @@ The two of you are not just fishing next to each other.
   Two mid-tier rods, or one deep-water setup and one shallow specialist?
 - **Shared boat.** Travel moves both of you. One player with a big enough reel
   can take the whole crew somewhere new, and both rods fish it.
+- **Charters.** The board carries three shared jobs at a time — land four
+  walleye, boat a catfish over 22 lb, pull off two double headers. They pay a
+  bonus on top of the fish and give the crew somewhere specific to go. Finish
+  one and a new one takes its place.
 
 ## Progression
 
@@ -96,12 +106,22 @@ Six spots, each opening up new species:
 records pay a 50% bounty, so it is worth hunting new fish rather than
 grinding the same one.
 
+Open the shop and tab across to **REGISTER** for the field guide: every
+species, its depth band, the lure size it needs, and — for anything you have
+not caught yet — the specific reason it will not bite you right now
+("below your line, needs a 175 ft reel", "ignores this lure, needs size 4 or
+bigger"). It is the fastest way to work out what to buy next.
+
+Reaching the last reel takes roughly an hour of play. The register, the
+record book and the charter board are the long tail after that.
+
 ## Files
 
 ```
 index.html      page layout, styling, controls splash
 src/data.js     rods, reels, lures, species and spots - tune balance here
-src/game.js     state machine, bite model, fight physics
+src/game.js     state machine, bite model, fight physics, fight styles
+src/charters.js the shared charter board
 src/render.js   canvas drawing of the lake
 src/ui.js       HUD, shop and travel menu
 src/main.js     input, main loop, save/load

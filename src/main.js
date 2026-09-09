@@ -81,6 +81,7 @@ function save() {
       cash: game.cash, spot: game.spot, records: game.records,
       totalCaught: game.totalCaught, totalEarned: game.totalEarned,
       doubleHeaders: game.doubleHeaders, assists: game.assists,
+      charters: game.charters, chartersDone: game.chartersDone,
       anglers: game.anglers.map(a => ({
         rod: a.rod, reel: a.reel, lure: a.lure, owned: a.owned,
         xp: a.xp, level: a.level, caught: a.caught, lost: a.lost, heaviest: a.heaviest,
@@ -98,6 +99,7 @@ function load() {
       cash: d.cash | 0, spot: d.spot | 0, records: d.records || {},
       totalCaught: d.totalCaught | 0, totalEarned: d.totalEarned | 0,
       doubleHeaders: d.doubleHeaders | 0, assists: d.assists | 0,
+      charters: d.charters || [], chartersDone: d.chartersDone | 0,
     });
     (d.anglers || []).forEach((s, i) => {
       const a = game.anglers[i];
@@ -116,6 +118,7 @@ function resetGame() {
   try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
   game = newGame();
   seedAmbient(game);
+  initCharters(game);
   logLine(game, 'A fresh season. The cane poles are back in the boat.', 'info');
 }
 
@@ -130,6 +133,7 @@ const el = {
   shop:   [document.getElementById('shop0'), document.getElementById('shop1')],
   log:     document.getElementById('log'),
   records: document.getElementById('records'),
+  charters: document.getElementById('charters'),
 };
 
 function fit() {
@@ -189,6 +193,9 @@ function frame(now) {
     renderShop(el.shop[i], game, game.anglers[i], shops[i], KEYS[i].label);
   }
   renderLog(el.log, game);
+  renderCharters(el.charters, game);
+  const chc = document.getElementById('chcount');
+  if (chc) chc.textContent = game.chartersDone ? `${game.chartersDone} done` : '';
   renderRecords(el.records, game);
 
   saveTimer += dt;
@@ -210,6 +217,7 @@ function cycleLure(a) {
 load();
 fit();
 seedAmbient(game);
+if (!game.charters || !game.charters.length) initCharters(game);
 if (!game.log.length) {
   logLine(game, 'Morning on the lake. Two rods, one boat, one wallet.', 'info');
 }

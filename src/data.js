@@ -90,42 +90,45 @@ const LURES = [
    rarity   : relative spawn weight. Higher shows up more often.
    ppl      : dollars per pound at the dock.
    minLure  : the smallest lure size this fish will commit to.
+   fight    : how it behaves once hooked. See FIGHT_STYLES in game.js.
+              steady/jumper/runner/bulldog/deep all need different hands
+              on the reel, which is what makes each species feel distinct.
    --------------------------------------------------------------- */
 const SPECIES = [
   { id:'bluegill', name:'Bluegill',          tags:['panfish'], min:    0, max:  15, wMin:0.2, wMax:  1.2,
-    str: 2,  stam: 22,  rarity: 100, ppl:  6, minLure:1, color:'#e0a13a', belly:'#f2d98a' },
+    str: 2,  stam: 22,  rarity: 100, ppl:  6, minLure:1, fight:'steady', color:'#e0a13a', belly:'#f2d98a' },
   { id:'rockbass', name:'Rock Bass',         tags:['panfish'], min:    0, max:  20, wMin:0.3, wMax:  1.5,
-    str: 3,  stam: 24,  rarity:  80, ppl:  7, minLure:1, color:'#8a7a4a', belly:'#d8cc9a' },
+    str: 3,  stam: 24,  rarity:  80, ppl:  7, minLure:1, fight:'steady', color:'#8a7a4a', belly:'#d8cc9a' },
   { id:'perch',    name:'Yellow Perch',      tags:['panfish'], min:    2, max:  30, wMin:0.3, wMax:  2.0,
-    str: 3,  stam: 26,  rarity:  85, ppl:  8, minLure:1, color:'#d9b12e', belly:'#f6e6a0' },
+    str: 3,  stam: 26,  rarity:  85, ppl:  8, minLure:1, fight:'steady', color:'#d9b12e', belly:'#f6e6a0' },
   { id:'crappie',  name:'Black Crappie',     tags:['panfish'], min:    3, max:  28, wMin:0.4, wMax:  3.0,
-    str: 4,  stam: 30,  rarity:  70, ppl:  9, minLure:1, color:'#6f7f6a', belly:'#cfd8c2' },
+    str: 4,  stam: 30,  rarity:  70, ppl:  9, minLure:1, fight:'steady', color:'#6f7f6a', belly:'#cfd8c2' },
   { id:'largemouth',name:'Largemouth Bass',  tags:['bass'],    min:    2, max:  32, wMin:1.0, wMax: 12.0,
-    str: 9,  stam: 58,  rarity:  55, ppl: 14, minLure:2, color:'#4f7a3a', belly:'#cbdda6' },
+    str: 9,  stam: 58,  rarity:  55, ppl: 14, minLure:2, fight:'jumper', color:'#4f7a3a', belly:'#cbdda6' },
   { id:'smallmouth',name:'Smallmouth Bass',  tags:['bass'],    min:   20, max:  45, wMin:1.0, wMax:  8.0,
-    str: 11, stam: 64,  rarity:  45, ppl: 16, minLure:2, color:'#8a6a3a', belly:'#e0c99a' },
+    str: 11, stam: 64,  rarity:  45, ppl: 16, minLure:2, fight:'jumper', color:'#8a6a3a', belly:'#e0c99a' },
   { id:'rainbow',  name:'Rainbow Trout',     tags:['trout'],   min:   22, max:  50, wMin:1.0, wMax: 14.0,
-    str: 10, stam: 68,  rarity:  40, ppl: 18, minLure:2, color:'#7d8fa8', belly:'#f0d2d8' },
+    str: 10, stam: 68,  rarity:  40, ppl: 18, minLure:2, fight:'jumper', color:'#7d8fa8', belly:'#f0d2d8' },
   { id:'walleye',  name:'Walleye',           tags:['walleye'], min:  38, max:  75, wMin:2.0, wMax: 16.0,
-    str: 10, stam: 58,  rarity:  38, ppl: 22, minLure:2, color:'#9a8f45', belly:'#efe3ae' },
+    str: 10, stam: 58,  rarity:  38, ppl: 22, minLure:2, fight:'steady', color:'#9a8f45', belly:'#efe3ae' },
   { id:'pike',     name:'Northern Pike',     tags:['pike'],    min:   24, max:  55, wMin:3.0, wMax: 30.0,
-    str: 17, stam: 84,  rarity:  30, ppl: 20, minLure:3, color:'#4a6a48', belly:'#d7e0b0' },
+    str: 17, stam: 84,  rarity:  30, ppl: 20, minLure:3, fight:'runner', color:'#4a6a48', belly:'#d7e0b0' },
   { id:'brown',    name:'Brown Trout',       tags:['trout'],   min:  40, max:  72, wMin:2.0, wMax: 25.0,
-    str: 14, stam: 78,  rarity:  22, ppl: 24, minLure:3, color:'#8f6a35', belly:'#efd9a4' },
+    str: 14, stam: 78,  rarity:  22, ppl: 24, minLure:3, fight:'jumper', color:'#8f6a35', belly:'#efd9a4' },
   { id:'channel',  name:'Channel Catfish',   tags:['catfish'], min:  62, max:  95, wMin:3.0, wMax: 35.0,
-    str: 19, stam: 98,  rarity:  30, ppl: 15, minLure:3, color:'#6d6357', belly:'#ded3c0' },
+    str: 19, stam: 98,  rarity:  30, ppl: 15, minLure:3, fight:'bulldog', color:'#6d6357', belly:'#ded3c0' },
   { id:'laketrout',name:'Lake Trout',        tags:['laketrout','trout'], min:  68, max:165, wMin:5.0, wMax: 45.0,
-    str: 23, stam:112,  rarity:  26, ppl: 28, minLure:4, color:'#5d6a72', belly:'#cdd7dc' },
+    str: 23, stam:112,  rarity:  26, ppl: 28, minLure:4, fight:'deep', color:'#5d6a72', belly:'#cdd7dc' },
   { id:'burbot',   name:'Burbot',            tags:['burbot'],  min: 115, max:185, wMin:2.0, wMax: 18.0,
-    str: 15, stam: 88,  rarity:  22, ppl: 20, minLure:4, color:'#7a6a4a', belly:'#d6c8a4' },
+    str: 15, stam: 88,  rarity:  22, ppl: 20, minLure:4, fight:'bulldog', color:'#7a6a4a', belly:'#d6c8a4' },
   { id:'flathead', name:'Flathead Catfish',  tags:['catfish'], min:  65, max:125, wMin:10.0,wMax: 90.0,
-    str: 35, stam:152,  rarity:  14, ppl: 26, minLure:4, color:'#7a6a3c', belly:'#e2d3a2' },
+    str: 35, stam:152,  rarity:  14, ppl: 26, minLure:4, fight:'bulldog', color:'#7a6a3c', belly:'#e2d3a2' },
   { id:'musky',    name:'Muskellunge',       tags:['musky','pike'], min:   36, max:  62, wMin:10.0,wMax: 60.0,
-    str: 31, stam:142,  rarity:   7, ppl: 40, minLure:5, color:'#5a6b4a', belly:'#dfe3b8' },
+    str: 31, stam:142,  rarity:   7, ppl: 40, minLure:5, fight:'runner', color:'#5a6b4a', belly:'#dfe3b8' },
   { id:'gar',      name:'Alligator Gar',     tags:['gar'],     min: 112, max: 160, wMin:20.0,wMax:140.0,
-    str: 46, stam:205,  rarity:   5, ppl: 45, minLure:5, color:'#5b5540', belly:'#cdc4a0' },
+    str: 46, stam:205,  rarity:   5, ppl: 45, minLure:5, fight:'runner', color:'#5b5540', belly:'#cdc4a0' },
   { id:'sturgeon', name:'Lake Sturgeon',     tags:['sturgeon'],min: 175, max:235, wMin:30.0,wMax:220.0,
-    str: 56, stam:265,  rarity:   6, ppl: 60, minLure:5, color:'#4a5560', belly:'#c2ccd4' },
+    str: 56, stam:265,  rarity:   6, ppl: 60, minLure:5, fight:'bulldog', color:'#4a5560', belly:'#c2ccd4' },
 ];
 
 /* ---------------------------------------------------------------
