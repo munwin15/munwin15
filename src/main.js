@@ -78,12 +78,13 @@ const SAVE_KEY = 'deepwaterduo.v1';
 function save() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      cash: game.cash, spot: game.spot, records: game.records,
+      spot: game.spot, records: game.records,
       totalCaught: game.totalCaught, totalEarned: game.totalEarned,
       doubleHeaders: game.doubleHeaders, assists: game.assists,
       charters: game.charters, chartersDone: game.chartersDone,
       anglers: game.anglers.map(a => ({
         rod: a.rod, reel: a.reel, lure: a.lure, owned: a.owned,
+        cash: a.cash, earned: a.earned,
         xp: a.xp, level: a.level, caught: a.caught, lost: a.lost, heaviest: a.heaviest,
       })),
     }));
@@ -96,7 +97,7 @@ function load() {
     if (!raw) return;
     const d = JSON.parse(raw);
     Object.assign(game, {
-      cash: d.cash | 0, spot: d.spot | 0, records: d.records || {},
+      spot: d.spot | 0, records: d.records || {},
       totalCaught: d.totalCaught | 0, totalEarned: d.totalEarned | 0,
       doubleHeaders: d.doubleHeaders | 0, assists: d.assists | 0,
       charters: d.charters || [], chartersDone: d.chartersDone | 0,
@@ -107,9 +108,17 @@ function load() {
       Object.assign(a, {
         rod: s.rod | 0, reel: s.reel | 0, lure: s.lure | 0,
         owned: s.owned || a.owned, xp: s.xp | 0, level: s.level || 1,
+        cash: s.cash | 0, earned: s.earned | 0,
         caught: s.caught | 0, lost: s.lost | 0, heaviest: s.heaviest || 0,
       });
     });
+
+    // Saves from the shared-wallet build carry one pot. Split it evenly
+    // rather than dropping it on the floor.
+    if (d.cash && !game.anglers.some(a => a.cash)) {
+      const split = Math.floor(d.cash / game.anglers.length);
+      for (const a of game.anglers) { a.cash = split; a.earned = split; }
+    }
   } catch (_) { /* corrupt save - start fresh rather than blow up */ }
 }
 

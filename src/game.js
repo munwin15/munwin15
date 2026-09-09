@@ -31,6 +31,7 @@ function makeAngler(index, name) {
     resultTimer: 0, result: null,
     assisting: false,                  // helping the partner land theirs
     hadAssist: false, hadPartnerOn: false,  // co-op bonuses latched per fight
+    cash: 0, earned: 0,                // this angler's own wallet
     xp: 0, level: 1,
     caught: 0, lost: 0, heaviest: 0,
     streak: 0,
@@ -39,7 +40,6 @@ function makeAngler(index, name) {
 
 function newGame() {
   return {
-    cash: 0,
     spot: 0,
     anglers: [makeAngler(0, 'Player 1'), makeAngler(1, 'Player 2')],
     records: {},        // speciesId -> { weight, length, by, spot }
@@ -309,7 +309,8 @@ function land(game, a, partner, assisted) {
   const base = dockValue(sp, f.weight);
   const value = Math.round(base * mult * (isRecord ? 1.5 : 1)) + 10;
 
-  game.cash += value;
+  a.cash += value;
+  a.earned += value;
   game.totalEarned += value;
   game.totalCaught++;
   a.caught++; a.streak++;
@@ -320,16 +321,20 @@ function land(game, a, partner, assisted) {
   if (isRecord) {
     game.records[sp.id] = { weight: f.weight, length: f.length, by: a.name, spot: SPOTS[game.spot].name };
   }
+  let mateShare = 0;
   if (netted && partner) {
-    const cut = Math.max(3, Math.round(value * 0.15));
-    partner.xp += Math.max(2, Math.round(cut / 4));
+    mateShare = Math.max(5, Math.round(value * 0.2));
+    partner.cash += mateShare;
+    partner.earned += mateShare;
+    game.totalEarned += mateShare;
+    partner.xp += Math.max(2, Math.round(mateShare / 4));
     partner.level = levelFor(partner.xp);
     partner.assisting = false;
   }
 
   a.phase = PHASE.RESULT;
   a.result = {
-    ok: true, fish: f, value, isRecord, doubleHeader, assisted: netted,
+    ok: true, fish: f, value, isRecord, doubleHeader, assisted: netted, mateShare,
     text: isRecord ? 'NEW RECORD!' : 'FISH ON THE BOAT',
     sub: `${sp.name} - ${f.weight.toFixed(1)} lb, ${f.length.toFixed(0)} in`,
   };
@@ -345,7 +350,7 @@ function land(game, a, partner, assisted) {
   let msg = `${a.name} landed a ${f.weight.toFixed(1)} lb ${sp.name} (+$${value})`;
   if (isRecord) msg += ' - lake record!';
   if (doubleHeader) msg += ' [double header]';
-  if (netted) msg += ' [netted by partner]';
+  if (netted) msg += ` [netted by ${partner ? partner.name : 'partner'}, +$${mateShare}]`;
   logLine(game, msg, isRecord ? 'record' : 'good');
 }
 

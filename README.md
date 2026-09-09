@@ -3,7 +3,8 @@
 A two-player co-op freshwater fishing game that runs locally in your browser.
 No install, no build step, no server, no internet connection.
 
-Two anglers share one boat, one lake and one wallet. You work your way from
+Two anglers share one boat and one lake, but each keeps their own wallet.
+You work your way from
 bluegill in the lily pads down to sturgeon in the Trench by upgrading rods,
 reels and lures.
 
@@ -79,14 +80,20 @@ The two of you are not just fishing next to each other.
   boat, hold your action key to work the net. It bleeds off their tension,
   speeds their retrieve, and pays you both.
 - **Double headers.** Land two fish at once for a 25% bonus on both.
-- **Shared wallet.** All money is pooled, so upgrades are a joint decision.
-  Two mid-tier rods, or one deep-water setup and one shallow specialist?
+- **Your own wallet.** You keep what you catch and buy your own gear, so
+  nobody upgrades for you. The two ways to earn from your partner's fish are
+  both cooperative, below.
+- **The deckhand's cut.** Netting a partner's fish pays you 20% of what it
+  was worth, on top of making it easier for them to land. It is the one way
+  to earn without a fish of your own, and it is how an angler who has had a
+  bad run catches back up.
 - **Shared boat.** Travel moves both of you. One player with a big enough reel
   can take the whole crew somewhere new, and both rods fish it.
 - **Charters.** The board carries three shared jobs at a time — land four
   walleye, boat a catfish over 22 lb, pull off two double headers. They pay a
   bonus on top of the fish and give the crew somewhere specific to go. Finish
-  one and a new one takes its place.
+  one and a new one takes its place. Both anglers' catches count towards a
+  charter, so the fee is **split evenly** between you.
 
 ## Progression
 

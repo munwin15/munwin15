@@ -40,8 +40,6 @@
     border: 1px solid var(--edge); border-radius: 8px;
     padding: 8px 14px;
   }
-  #topbar .cash { font-size: 22px; font-weight: 700; color: var(--good);
-                  font-family: ui-monospace, Menlo, Consolas, monospace; }
   #topbar .spot { font-size: 16px; font-weight: 600; }
   #topbar .spot em { color: var(--dim); font-style: normal; font-weight: 400; font-size: 13px; }
   #topbar .tally { margin-left: auto; color: var(--dim); font-size: 12px; }
@@ -71,6 +69,13 @@
   .pname.p0 { color: var(--p1); }
   .pname.p1 { color: var(--p2); }
   .rank { font-size: 11px; color: var(--dim); }
+  .wallet { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .wc { font-size: 21px; font-weight: 700; color: var(--good);
+        font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .we { font-size: 10px; color: var(--dim);
+        font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .shopcash { float: right; color: var(--good); font-weight: 700;
+              font-family: ui-monospace, Menlo, Consolas, monospace; }
   .status {
     background: var(--panel2); border-radius: 5px; padding: 6px 8px;
     font-size: 12px; color: var(--dim); text-align: center;
@@ -231,7 +236,7 @@
 <div id="splash">
   <div class="card">
     <h1>Deep <span>Water</span> Duo</h1>
-    <div class="tag">Two anglers, one boat, one shared wallet. Fish deeper, catch bigger.</div>
+    <div class="tag">Two anglers, one boat, two wallets. Fish deeper, catch bigger.</div>
 
     <div class="ctrls">
       <section>
@@ -264,7 +269,8 @@
       to work the net — it bleeds off their tension and pays you both. Land two fish at once for a
       <b>double header</b> bonus.<br>
       <b>Progress:</b> rods carry heavier fish, reels hold more line and unlock deeper spots, lures
-      decide which species even look at you. Money is shared, so plan the upgrades together.
+      decide which species even look at you. You each spend your own money, so nobody upgrades
+      for you — but charter fees are split, and netting your partner pays.
       Every species fights differently: pike run, catfish sulk, bass jump. Your panel tells you
       which you have on.
     </div>

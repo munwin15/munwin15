@@ -62,7 +62,7 @@ function rowGear(game, a, item, i, bucket, equippedIdx) {
   const equipped = equippedIdx === i;
   return {
     id: item.id, name: item.name, price: item.price, obj: item, kind: bucket, idx: i,
-    state: equipped ? 'equipped' : owned ? 'owned' : (game.cash >= item.price ? 'buy' : 'poor'),
+    state: equipped ? 'equipped' : owned ? 'owned' : (a.cash >= item.price ? 'buy' : 'poor'),
     note: gearNote(item, bucket),
     blurb: item.blurb,
   };
@@ -99,9 +99,9 @@ function shopConfirm(game, a, shop) {
 
   if (row.state === 'equipped') return;
   if (row.state === 'owned') { equip(a, row); return flash(shop, `${row.name} equipped.`); }
-  if (row.state === 'poor')  return flash(shop, `Short $${row.price - game.cash}.`);
+  if (row.state === 'poor')  return flash(shop, `Short $${row.price - a.cash}. Fish for it, or net your partner's.`);
 
-  game.cash -= row.price;
+  a.cash -= row.price;
   a.owned[row.kind].push(row.id);
   equip(a, row);
   logLine(game, `${a.name} bought the ${row.name} for $${row.price}.`, 'info');
@@ -148,6 +148,7 @@ function renderShop(el, game, a, shop, keys) {
   const html = `
     <div class="shop-head">
       <b>${a.name}</b> · ${rankName(a.level)} lvl ${a.level}
+      <span class="shopcash">$${a.cash.toLocaleString()}</span>
       <span class="tabs">${tabs}</span>
     </div>
     <div class="shop-list">${list}</div>
@@ -196,6 +197,8 @@ function renderHud(el, game, a, i) {
       <span class="pname p${i}">${a.name}</span>
       <span class="rank">${rankName(a.level)} · lvl ${a.level}</span>
     </div>
+    <div class="wallet"><span class="wc">$${a.cash.toLocaleString()}</span>
+      <span class="we">$${a.earned.toLocaleString()} earned</span></div>
     <div class="status ${statusCls}">${status}</div>
     ${tell ? `<div class="tell">${tell}</div>` : ''}
     <div class="gear">
@@ -251,7 +254,6 @@ function bitingPanel(game, a) {
 function renderTopBar(el, game) {
   const spot = SPOTS[game.spot];
   el.innerHTML = `
-    <span class="cash">$${game.cash.toLocaleString()}</span>
     <span class="spot">${spot.name} <em>· ${spot.bottom} ft deep</em></span>
     <span class="tally">${game.totalCaught} landed · ${game.doubleHeaders} double headers · ${game.assists} assists</span>`;
 }

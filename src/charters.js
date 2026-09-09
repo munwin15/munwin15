@@ -123,10 +123,14 @@ function checkCharters(game, a, f, ctx) {
 
     c.progress++;
     if (c.progress >= c.target) {
-      game.cash += c.reward;
-      game.totalEarned += c.reward;
+      // A charter is crew work - both anglers' catches count towards it -
+      // so the fee is split down the middle rather than paid to whoever
+      // happened to land the last fish.
+      const share = Math.round(c.reward / game.anglers.length);
+      for (const angler of game.anglers) { angler.cash += share; angler.earned += share; }
+      game.totalEarned += share * game.anglers.length;
       game.chartersDone = (game.chartersDone || 0) + 1;
-      logLine(game, `Charter complete: ${c.text} (+$${c.reward})`, 'record');
+      logLine(game, `Charter complete: ${c.text} (+$${share} each)`, 'record');
       const fresh = rollCharter(game, game.charters.filter(x => x !== c).map(x => x.kind));
       if (fresh) game.charters[i] = fresh; else game.charters.splice(i--, 1);
       if (window.blip) window.blip('buy');
