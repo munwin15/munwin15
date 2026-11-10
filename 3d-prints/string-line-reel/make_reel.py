@@ -1,131 +1,158 @@
 #!/usr/bin/env python3
-"""Generate string_line_reel.stl - a string line reel with tall end discs and a
-13 mm hex (bolt head) on top so it can be wound with a 13 mm socket or spanner.
+"""Generate the string line reel and its clip-in handle.
 
-Plain Python, no dependencies. All dimensions in millimetres.
-Run:  python3 make_reel.py
+  string_line_reel.stl  reel with tall end discs, a 13 mm hex (bolt head) on top
+                        and a snap socket in the bottom
+  reel_handle.stl       handle whose split pin clips into that socket; the reel
+                        spins freely on it
+
+All dimensions in millimetres.
+Run:  pip install manifold3d && python3 make_reel.py
 """
 import math
 import os
 import struct
 
-# ---- Dimensions (edit these and re-run) -------------------------------------
+from manifold3d import CrossSection, Manifold, set_circular_segments
+
+# ---- Reel --------------------------------------------------------------------
 FLANGE_DIA = 90.0     # end disc diameter (tall discs: 30 mm above the core)
 FLANGE_THK = 3.5      # end disc thickness
 CORE_DIA = 30.0       # diameter the string winds onto
 WIND_WIDTH = 40.0     # gap between the two discs
 HEX_AF = 13.0         # bolt head size, across flats
 HEX_HEIGHT = 10.0     # bolt head height
-AXLE_DIA = 8.4        # blind axle hole in the bottom (clearance for M8 / 8 mm rod)
 EDGE_CHAMFER = 0.8    # chamfer on disc rims
 CORE_FILLET = 4.0     # 45 degree gusset where the core meets each disc
-SEGMENTS = 144        # facets around the circle (must be divisible by 6)
-# -----------------------------------------------------------------------------
+ANCHOR_HOLE_DIA = 3.5 # string tie-off hole through the top disc
 
-N = SEGMENTS
+# ---- Handle clip (socket in the reel + pin on the handle) ---------------------
+PIN_DIA = 12.0        # handle pin
+BORE_CLEARANCE = 0.3  # radial gap between pin and socket, so the reel spins
+SOCKET_DEPTH = 36.0   # depth of the socket in the bottom of the reel
+GROOVE_Z = 28.0       # height of the catch groove above the reel's bottom face
+GROOVE_LEN = 4.0      # length of the groove
+GROOVE_DEPTH = 1.5    # how much wider the groove is than the socket (radial)
+BARB = 1.0            # how far the barbs stand out past the socket wall (radial)
+SLOT_WIDTH = 4.0      # split in the pin that lets the barbs squeeze in
+AXIAL_PLAY = 0.4      # up/down play of the reel on the handle
+
+# ---- Handle grip ---------------------------------------------------------------
+GRIP_DIA = 28.0
+GRIP_LEN = 95.0
+SHOULDER_DIA = 36.0   # face the reel sits on
+SHOULDER_THK = 3.0
+FLAT = 5.0            # distance from pin axis to the flat the handle prints on
+# -------------------------------------------------------------------------------
+
+set_circular_segments(144)
+
 R = FLANGE_DIA / 2
 rc = CORE_DIA / 2
-rh = AXLE_DIA / 2
 t = FLANGE_THK
 c = EDGE_CHAMFER
 f = CORE_FILLET
 z1 = t                    # top of bottom disc
 z2 = t + WIND_WIDTH       # underside of top disc
 z3 = z2 + t               # top of top disc
-z4 = z3 + HEX_HEIGHT      # top of bolt head
-apothem = HEX_AF / 2
-axle_depth = z2           # hole stops under the top disc, leaving the hex solid
+rp = PIN_DIA / 2
+rb = rp + BORE_CLEARANCE  # socket radius
+rg = rb + GROOVE_DEPTH    # groove radius
+ledge = GROOVE_DEPTH * math.tan(math.radians(30))   # catch face, 30 deg off flat
+g0 = GROOVE_Z
+g1 = GROOVE_Z + GROOVE_LEN
 
 
-def circle(r, z):
-    return [(r * math.cos(2 * math.pi * i / N), r * math.sin(2 * math.pi * i / N), z)
-            for i in range(N)]
+def revolve(profile):
+    """Lathe an (r, z) outline around the Z axis."""
+    return Manifold.revolve(CrossSection([profile]))
 
 
-def hexagon(z):
-    """N points on a hexagon perimeter (flats exactly planar, corners every 60 deg)."""
-    pts = []
-    for i in range(N):
-        a = 2 * math.pi * i / N
-        local = (a % (math.pi / 3)) - math.pi / 6
-        r = apothem / math.cos(local)
-        pts.append((r * math.cos(a), r * math.sin(a), z))
-    return pts
+def build_reel():
+    body = revolve([
+        (rb + 0.8, 0), (R - c, 0), (R, c), (R, z1 - c), (R - c, z1),
+        (rc + f, z1), (rc, z1 + f), (rc, z2 - f), (rc + f, z2),
+        (R - c, z2), (R, z2 + c), (R, z3 - c), (R - c, z3), (0, z3),
+        # socket, from its pointed ceiling back down to the mouth
+        (0, SOCKET_DEPTH + rb), (rb, SOCKET_DEPTH),
+        (rb, g1 + GROOVE_DEPTH), (rg, g1),      # 45 deg roof: prints unsupported
+        (rg, g0), (rb, g0 - ledge),             # catch face for the barbs
+        (rb, 0.8),
+    ])
+    apothem = HEX_AF / 2
+    corner = apothem / math.cos(math.pi / 6)
+    hexagon = Manifold.extrude(CrossSection.circle(corner, 6), HEX_HEIGHT)
+    crown = revolve([(0, 0), (corner + 1, 0), (corner + 1, HEX_HEIGHT - 1.6),
+                     (apothem - 0.3, HEX_HEIGHT), (0, HEX_HEIGHT)])
+    head = (hexagon ^ crown).translate([0, 0, z3 - 0.01])
+    anchor = Manifold.cylinder(t + 2, ANCHOR_HOLE_DIA / 2).translate(
+        [rc + f + 3.5, 0, z2 - 1])
+    return body + head - anchor
 
 
-# Rings from the ceiling of the axle hole, down and around the outside, up to the hex top.
-rings = [
-    circle(rh, axle_depth),
-    circle(rh, 0.6),
-    circle(rh + 0.6, 0),                 # lead-in chamfer on the axle hole
-    circle(R - c, 0),
-    circle(R, c),
-    circle(R, z1 - c),
-    circle(R - c, z1),
-    circle(rc + f, z1),
-    circle(rc, z1 + f),
-    circle(rc, z2 - f),
-    circle(rc + f, z2),
-    circle(R - c, z2),
-    circle(R, z2 + c),
-    circle(R, z3 - c),
-    circle(R - c, z3),
-    hexagon(z3),
-    hexagon(z4 - 1.0),
-    circle(apothem - 0.4, z4),           # chamfered crown, like a real bolt head
-]
-start_apex = (0.0, 0.0, axle_depth)
-end_apex = (0.0, 0.0, z4)
-
-tris = []
-for i in range(N):
-    j = (i + 1) % N
-    tris.append((start_apex, rings[0][i], rings[0][j]))
-    for a, b in zip(rings, rings[1:]):
-        tris.append((a[i], b[i], b[j]))
-        tris.append((a[i], b[j], a[j]))
-    tris.append((rings[-1][i], end_apex, rings[-1][j]))
+def build_handle():
+    """Handle in assembled position: pin along +Z, reel sits on z = 0."""
+    rbarb = rb + BARB
+    # underside of the barb sits AXIAL_PLAY above the socket's catch face
+    barb_hi = g0 - ledge * (rg - rbarb) / GROOVE_DEPTH + AXIAL_PLAY
+    barb_lo = barb_hi - (rbarb - rp) * math.tan(math.radians(30))
+    tip = SOCKET_DEPTH - 1.5
+    pin = revolve([
+        (0, -SHOULDER_THK), (SHOULDER_DIA / 2 - 1, -SHOULDER_THK),
+        (SHOULDER_DIA / 2, -SHOULDER_THK + 1), (SHOULDER_DIA / 2, 0),
+        (rp + 0.6, 0), (rp, 0.6),
+        (rp, barb_lo), (rbarb, barb_hi), (rbarb, barb_hi + 1.5),
+        (rp - 1.0, tip), (0, tip),
+    ])
+    slot_z = 5.0
+    slot = (Manifold.cube([40, SLOT_WIDTH, 60]).translate([-20, -SLOT_WIDTH / 2, slot_z])
+            + Manifold.cylinder(40, SLOT_WIDTH / 2).rotate([0, 90, 0])
+              .translate([-20, 0, slot_z]))
+    rgrip = GRIP_DIA / 2
+    top, bot = -SHOULDER_THK + 0.01, -SHOULDER_THK - GRIP_LEN
+    grip = revolve([
+        (0, bot), (rgrip - 5, bot), (rgrip - 1.5, bot + 1.5), (rgrip, bot + 6),
+        (rgrip, top - 4), (rgrip - 2, top), (0, top),
+    ]).translate([rgrip - FLAT - 5, 0, 0])   # shifted so the flat is 21 mm wide
+    handle = pin - slot + grip
+    return handle.trim_by_plane([1, 0, 0], -FLAT)   # flat to print on
 
 
-def signed_volume(ts):
-    v = 0.0
-    for p, q, r in ts:
-        v += (p[0] * (q[1] * r[2] - q[2] * r[1])
-              - p[1] * (q[0] * r[2] - q[2] * r[0])
-              + p[2] * (q[0] * r[1] - q[1] * r[0])) / 6
-    return v
+def write_stl(solid, name):
+    mesh = solid.to_mesh()
+    verts = mesh.vert_properties[:, :3]
+    tris = mesh.tri_verts
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    with open(path, "wb") as fh:
+        fh.write(name.encode().ljust(80, b" "))
+        fh.write(struct.pack("<I", len(tris)))
+        for tri in tris:
+            p, q, r = (verts[i] for i in tri)
+            u, v = q - p, r - p
+            n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+                 u[0] * v[1] - u[1] * v[0])
+            m = math.sqrt(sum(k * k for k in n)) or 1.0
+            fh.write(struct.pack("<3f", *(k / m for k in n)))
+            for pt in (p, q, r):
+                fh.write(struct.pack("<3f", *pt))
+            fh.write(b"\0\0")
+    box = solid.bounding_box()
+    size = " x ".join(f"{box[i + 3] - box[i]:.1f}" for i in range(3))
+    print(f"{name}: {len(tris)} triangles, {solid.volume() / 1000:.1f} cm3, "
+          f"{size} mm, status {solid.status().name}")
 
 
-if signed_volume(tris) < 0:              # make normals face outward
-    tris = [(p, r, q) for p, q, r in tris]
+reel = build_reel()
+handle = build_handle()
 
+# ---- Fit checks in the assembled position -------------------------------------
+seated = (reel ^ handle).volume()
+slack = (reel ^ handle.translate([0, 0, -AXIAL_PLAY * 0.9])).volume()
+pulled = (reel ^ handle.translate([0, 0, -AXIAL_PLAY - 0.5])).volume()
+print(f"overlap seated: {seated:.3f} mm3 (want 0)")
+print(f"overlap at end of play: {slack:.3f} mm3 (want 0)")
+print(f"overlap when pulled out further: {pulled:.1f} mm3 (want > 0: barbs catch)")
 
-def normal(p, q, r):
-    ux, uy, uz = q[0] - p[0], q[1] - p[1], q[2] - p[2]
-    vx, vy, vz = r[0] - p[0], r[1] - p[1], r[2] - p[2]
-    n = (uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx)
-    m = math.sqrt(sum(k * k for k in n)) or 1.0
-    return tuple(k / m for k in n)
-
-
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "string_line_reel.stl")
-with open(out, "wb") as fh:
-    fh.write(b"string line reel, 13 mm hex drive".ljust(80, b" "))
-    fh.write(struct.pack("<I", len(tris)))
-    for tri in tris:
-        fh.write(struct.pack("<3f", *normal(*tri)))
-        for p in tri:
-            fh.write(struct.pack("<3f", *p))
-        fh.write(b"\0\0")
-
-# ---- Self-check: every edge must be shared by exactly two triangles ----------
-edges = {}
-for tri in tris:
-    k = [tuple(round(x, 5) for x in p) for p in tri]
-    for a, b in ((k[0], k[1]), (k[1], k[2]), (k[2], k[0])):
-        edges[(a, b)] = edges.get((a, b), 0) + 1
-watertight = all(n == 1 and edges.get((b, a)) == 1 for (a, b), n in edges.items())
-print(f"wrote {out}")
-print(f"triangles: {len(tris)}  watertight: {watertight}  "
-      f"volume: {signed_volume(tris) / 1000:.1f} cm3")
-print(f"size: {FLANGE_DIA:.0f} mm dia x {z4:.1f} mm tall")
+write_stl(reel, "string_line_reel.stl")
+# lay the handle on its flat, ready to print
+write_stl(handle.rotate([0, -90, 0]).translate([0, 0, FLAT]), "reel_handle.stl")
