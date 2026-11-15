@@ -26,7 +26,7 @@ FLANGE_DIA = 90.0     # end disc diameter (tall discs: 30 mm above the core)
 TOP_FLANGE_THK = 3.5
 BOT_FLANGE_THK = 5.5  # thicker: the scroll track is cut 2.8 mm into its face
 CORE_DIA = 30.0       # diameter the string winds onto
-WIND_WIDTH = 40.0     # gap between the two discs
+WIND_WIDTH = 60.0     # gap between the two discs (length of the core)
 HEX_AF = 13.0         # bolt head size, across flats
 HEX_HEIGHT = 10.0     # bolt head height
 EDGE_CHAMFER = 0.8    # chamfer on disc rims
@@ -48,25 +48,26 @@ AXIAL_PLAY = 0.4      # up/down play of the reel on the handle
 GRIP_DIA = 28.0
 GRIP_LEN = 95.0
 NECK_DIA = 15.0       # neck between reel and grip; keeps fingers off the gear
-NECK_LEN = 50.0
-SHOULDER_DIA = 23.0   # face the reel sits on
+NECK_LEN = 66.0       # from the reel's bottom face to the top of the grip
+NECK_Y = -11.5        # neck and grip sit off-centre, clear of the gear
+SHOULDER_DIA = 23.0   # face the reel sits on (recessed into the reel's bottom)
 SHOULDER_THK = 3.0
 FLAT = 5.0            # distance from pin axis to the flat the handle prints on
 PLATE_THK = 3.0       # level-wind plate, printed on the bed with the handle
 
 # ---- Level-wind ----------------------------------------------------------------
 MODULE = 1.25         # gear tooth size; scroll pitch = pi * MODULE
-TEETH = 34            # reel turns per full back-and-forth of the guide
+TEETH = 48            # reel turns per full back-and-forth of the guide
 BACKLASH = 0.3        # tooth thinning for printed fit
 MESH_GAP = 0.15       # extra distance between wheel and scroll
-WHEEL_Y = 30.75       # wheel axle distance from the reel axis
+WHEEL_Y = 29.0        # wheel axle distance from the reel axis
 WHEEL_THK = 4.5
 AXLE_DIA = 8.0
-CRANK = 14.5          # crank pin radius: guide travel = 2 * CRANK
+CRANK = 23.0          # crank pin radius: guide travel = 2 * CRANK
 CRANK_PIN_DIA = 5.0
 POST_DIA = 7.0        # guide posts
-POST_Y = 64.5
-POST_Z = (-12.0, 28.0)
+POST_Y = 68.0
+POST_Z = (-24.0, 33.0)
 EYE_Y = 52.0          # string eye distance from the reel axis
 EYE_DIA = 6.0
 FIT = 0.25            # running clearance (radial) on axle, posts and crank pin
@@ -87,6 +88,7 @@ rg = rb + GROOVE_DEPTH        # groove radius
 ledge = GROOVE_DEPTH * math.tan(math.radians(30))   # catch face, 30 deg off flat
 g0 = GROOVE_Z
 g1 = GROOVE_Z + GROOVE_LEN
+CB_R = SHOULDER_DIA / 2 + 0.5   # counterbore radius in the reel's bottom face
 
 PA = math.radians(20)                     # gear pressure angle
 pitch = math.pi * MODULE                  # scroll pitch = advance per reel turn
@@ -169,14 +171,15 @@ def scroll_track():
 
 def build_reel():
     body = revolve([
-        (rb + 0.8, 0), (R - c, 0), (R, c), (R, z1 - c), (R - c, z1),
+        (CB_R + 0.5, 0), (R - c, 0), (R, c), (R, z1 - c), (R - c, z1),
         (rc + f, z1), (rc, z1 + f), (rc, z2 - f), (rc + f, z2),
         (R - c, z2), (R, z2 + c), (R, z3 - c), (R - c, z3), (0, z3),
         # socket, from its pointed ceiling back down to the mouth
         (0, SOCKET_DEPTH + rb), (rb, SOCKET_DEPTH),
         (rb, g1 + GROOVE_DEPTH), (rg, g1),      # 45 deg roof: prints unsupported
         (rg, g0), (rb, g0 - ledge),             # catch face for the barbs
-        (rb, 0.8),
+        (rb, SHOULDER_THK + 0.8), (rb + 0.8, SHOULDER_THK),   # counterbore for the
+        (CB_R, SHOULDER_THK),                               # handle's shoulder
     ])
     apothem = HEX_AF / 2
     corner = apothem / math.cos(math.pi / 6)
@@ -198,31 +201,39 @@ def build_handle():
     tip = SOCKET_DEPTH - 1.5
     rs = SHOULDER_DIA / 2
     pin = revolve([
-        (0, -SHOULDER_THK), (rs - 1, -SHOULDER_THK), (rs, -SHOULDER_THK + 1), (rs, 0),
-        (rp + 0.6, 0), (rp, 0.6),
+        (0, -0.01), (rs, -0.01), (rs, SHOULDER_THK - 0.8), (rs - 0.8, SHOULDER_THK),
+        (rp + 0.6, SHOULDER_THK), (rp, SHOULDER_THK + 0.6),
         (rp, barb_lo), (rbarb, barb_hi), (rbarb, barb_hi + 1.5),
         (rp - 1.0, tip), (0, tip),
     ])
-    slot_z = 5.0
+    slot_z = SHOULDER_THK + 3.0
     slot = (Manifold.cube([40, SLOT_WIDTH, 60]).translate([-20, -SLOT_WIDTH / 2, slot_z])
             + Manifold.cylinder(40, SLOT_WIDTH / 2).rotate([0, 90, 0])
               .translate([-20, 0, slot_z]))
-    neck_bot = -SHOULDER_THK - NECK_LEN
-    neck = Manifold.cylinder(NECK_LEN + 1, NECK_DIA / 2).translate([0, 0, neck_bot - 0.5])
+    neck_bot = -NECK_LEN
+    # half-disc under the shoulder (the guide's yoke passes on the other side),
+    # blended into the off-centre neck
+    half = Manifold.cylinder(3.3, rs).translate([0, 0, -3]).trim_by_plane([0, -1, 0], 0)
+    neck_top = Manifold.cylinder(1, NECK_DIA / 2).translate([0, NECK_Y, -15])
+    bridge = (half + neck_top).hull()
+    neck = Manifold.cylinder(-neck_bot - 14.5, NECK_DIA / 2).translate(
+        [0, NECK_Y, neck_bot - 0.5])
+    neck += bridge
     rgrip = GRIP_DIA / 2
     top, bot = neck_bot, neck_bot - GRIP_LEN
     grip = revolve([
         (0, bot), (rgrip - 5, bot), (rgrip - 1.5, bot + 1.5), (rgrip, bot + 6),
         (rgrip, top - 4), (rgrip - 2, top), (0, top),
-    ]).translate([rgrip - FLAT - 5, 0, 0])   # shifted so the flat is 21 mm wide
+    ]).translate([rgrip - FLAT - 5, NECK_Y, 0])   # shifted so the flat is 21 mm wide
     body = (pin - slot + neck + grip).trim_by_plane([1, 0, 0], X_BED)
 
     # level-wind plate: lies on the bed, runs under the reel and up beside it
     rib0 = POST_Y + 7.0
-    plate = slab(poly([(0, -1), (47, -1), (54, 6), (54, 38), (rib0 + 3, 38),
-                       (rib0 + 3, -30), (50, neck_bot + 1), (0, neck_bot + 1)]),
+    rib_lo, rib_hi = POST_Z[0] - 12, POST_Z[1] + 8
+    plate = slab(poly([(NECK_Y, -1), (47, -1), (54, 6), (54, rib_hi), (rib0 + 3, rib_hi),
+                       (rib0 + 3, rib_lo), (45, neck_bot + 1), (NECK_Y, neck_bot + 1)]),
                  X_BED, X_PLATE)
-    rib = slab(rect(rib0, rib0 + 3, -30, 38), X_BED, X_PLATE + 5)
+    rib = slab(rect(rib0, rib0 + 3, rib_lo, rib_hi), X_BED, X_PLATE + 5)
     axle = (slab(disc(WHEEL_Y, WHEEL_Z, AXLE_DIA / 2 + 2.5), X_PLATE - 0.1, X_WHEEL0)
             + slab(disc(WHEEL_Y, WHEEL_Z, AXLE_DIA / 2), X_PLATE - 0.1, X_WHEEL1))
     posts = Manifold()
